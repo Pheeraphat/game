@@ -207,32 +207,23 @@ class GearLibrary {
     }
 
     renderBackground() {
+        gameLibrary.beginWebGLHUD();
         push();
-        resetMatrix();
-        drawingContext.disable(drawingContext.DEPTH_TEST);
 
-        let backgroundImage = (gameLibrary.camera.isEnabled) ? gameLibrary.camera.getImage() : gameLibrary.gameImageArray[GearLibrary.IMAGE_BACKGROUND].image;
-        let canvasRatio = gameLibrary.displayWidth / gameLibrary.displayHeight;
-        let imageRatio = backgroundImage.width / backgroundImage.height;
-        let w = gameLibrary.displayWidth;
-        let h = gameLibrary.displayWidth / imageRatio;
-
-        if (canvasRatio < imageRatio) {
-            w = gameLibrary.displayHeight * imageRatio;
-            h = gameLibrary.displayHeight;
+        if (gameLibrary.camera.isEnabled) {
+            gameLibrary.camera.render();
+        } else {
+            imageMode(CENTER);
+            image(gameLibrary.gameImageArray[GearLibrary.IMAGE_BACKGROUND].image, gameLibrary.displayCenterPoint.x, gameLibrary.displayCenterPoint.y, gameLibrary.displayWidth, gameLibrary.displayHeight, 0, 0, gameLibrary.gameImageArray[GearLibrary.IMAGE_BACKGROUND].width, gameLibrary.gameImageArray[GearLibrary.IMAGE_BACKGROUND].height, COVER);
         }
 
-        let x = (gameLibrary.displayWidth - w) * 0.5;
-        let y = (gameLibrary.displayHeight - h) * 0.5;
-
-        image(backgroundImage, x - gameLibrary.displayCenterPoint.x, y - gameLibrary.displayCenterPoint.y, w, h);
-        drawingContext.enable(drawingContext.DEPTH_TEST);
         pop();
+        gameLibrary.endWebGLHUD();
     }
 
     renderHUD() {
-        push();
         gameLibrary.beginWebGLHUD();
+        push();
         stroke(0);
         textSize(min(gameLibrary.displayWidth, gameLibrary.displayHeight) * 0.05);
         strokeWeight(textSize() * 0.2);
@@ -248,8 +239,8 @@ class GearLibrary {
             this.renderStartButton(GearLibrary.GAME_MODE_NEW_GAME);
         }
 
-        gameLibrary.endWebGLHUD();
         pop();
+        gameLibrary.endWebGLHUD();
     }
 
     renderBoard() {
@@ -584,7 +575,7 @@ class GearButton {
 class GearCamera {
     static get MIN_DISTANCE()      {return 150;}
     static get MAX_DISTANCE()      {return 1000;}
-    static get NORMAL_DISTANCE()   {return 600;}
+    static get NORMAL_DISTANCE()   {return 700;}
 
     static get ZOOM_OUT_DURATION() {return 3000;}
     static get ZOOM_IN_DURATION()  {return 1000;}
@@ -954,7 +945,7 @@ class GearBoard {
         this.boardSize = new GameSize();
         this.boardCenter = new GamePoint();
 
-        this.rotationSpeed = (QUARTER_PI * 0.25) / 1000;
+        this.rotationSpeed = (QUARTER_PI * 0.50) / 1000;
         this.angle = new GamePoint();
         this.startAngle = new GamePoint();
         this.previousMouse = new GamePoint(-1, -1);
@@ -1336,7 +1327,7 @@ class GearBoard {
     onMouseDrag() {
         if (this.isReady && this.isDragging) {
             let delta = new GamePoint(mouseX - this.previousMouse.x, mouseY - this.previousMouse.y);
-            let speed = this.rotationSpeed * deltaTime;
+            let speed = this.rotationSpeed * deltaTime * ((gameLibrary.targetFrameRate > 0) ? (gameLibrary.targetFrameRate / gameLibrary.defaultFrameRate) : 1);
 
             this.angle.y += delta.x * speed;
             this.angle.x -= delta.y * speed;
@@ -1449,6 +1440,7 @@ GameLibrary.prototype.onLoad = function() {
     this.addSoundFilename(GearLibrary.SOUND_GEAR_1,             "Gear1");
 
     //this.fontInit(fontFilenameString);
+    this.useDefaultFrameRate();
     this.isWebGLEnabled = true;
     this.camera.isEnabled = false;
     this.numberOfHUDs = 0;

@@ -321,7 +321,6 @@ class GameLibrary {
         if (this.isWebGLEnabled) {
             drawingContext.disable(drawingContext.DEPTH_TEST);
             resetMatrix();
-            ortho(-this.displayCenterPoint.x, this.displayCenterPoint.x, -this.displayCenterPoint.y, this.displayCenterPoint.y, 0, 1000);
             translate(-this.displayCenterPoint.x, -this.displayCenterPoint.y);
         }
     }
@@ -1544,21 +1543,26 @@ class GameLibrary {
         }
     }
 
+    updateFPS() {
+        this.fpsSummary += this.getFrameRate();
+
+        if (++this.fpsSummaryCounter >= 10) {
+            this.fps = this.fpsSummary / this.fpsSummaryCounter;
+            this.fpsSummary = 0.0;
+            this.fpsSummaryCounter = 0;
+            this.fpsString = nf(this.fps, 1, 2);
+        }
+    }
+
     renderFPS(rgb) {
         if (this.isFPSVisibled) {
-            this.fpsSummary += this.getFrameRate();
-
-            if (++this.fpsSummaryCounter >= 10) {
-                this.fps = this.fpsSummary / this.fpsSummaryCounter;
-                this.fpsSummary = 0.0;
-                this.fpsSummaryCounter = 0;
-                this.fpsString = "FPS " + nf(this.fps, 1, 2);
-            }
-
+            this.updateFPS();
+            this.beginWebGLHUD();
             push();
             textSize(this.fpsTextSize);
-            this.offscreen.renderString(this.fpsPosition.x, this.fpsPosition.y, this.fpsString, rgb, 0xff);
+            this.offscreen.renderString(this.fpsPosition.x, this.fpsPosition.y, "FPS " + this.fpsString, rgb, 0xff);
             pop();
+            this.endWebGLHUD();
         }
     }
 
@@ -1889,6 +1893,10 @@ class GameLibrary {
 
         this.displayHalfSize.set(this.displayWidth * 0.5, this.displayHeight * 0.5);
         this.displayCenterPoint.set(this.displayHalfSize.width, this.displayHalfSize.height);
+
+        if (this.isWebGLEnabled) {
+            ortho(-this.displayCenterPoint.x, this.displayCenterPoint.x, -this.displayCenterPoint.y, this.displayCenterPoint.y);
+        }
 
         this.offscreen.displayWidth = this.displayWidth;
         this.offscreen.displayHeight = this.displayHeight;
@@ -2690,6 +2698,7 @@ class GameSplashScreen {
     }
 
     render() {
+        this.parent.beginWebGLHUD();
         push();
 
         if (this.isVisibled) {
@@ -2721,15 +2730,14 @@ class GameSplashScreen {
         }
 
         if (this.isFadeToColor) {
-            this.parent.beginWebGLHUD();
             push();
             fill(this.fadeToRed, this.fadeToGreen, this.fadeToBlue, 255.0 - this.alpha);
             rect(0, 0, this.parent.displayWidth, this.parent.displayHeight);
             pop();
-            this.parent.endWebGLHUD();
         }
 
         pop();
+        this.parent.endWebGLHUD();
     }
 }
 
@@ -3396,15 +3404,21 @@ class GameLoadingScreen {
         }
     }
 
-    render() {
-        if (this.numberOfFiles > 0) {
+    renderBackground() {
+        if (this.numberOfFiles > 0 && this.backgroundImageIndex != GameLibrary.NONE && gameLibrary.gameImageArray[this.backgroundImageIndex] != null) {
+            gameLibrary.beginWebGLHUD();
             push();
+            imageMode(CENTER);
+            image(gameLibrary.gameImageArray[this.backgroundImageIndex].image, gameLibrary.displayCenterPoint.x, gameLibrary.displayCenterPoint.y, gameLibrary.displayWidth, gameLibrary.displayHeight, 0, 0, gameLibrary.gameImageArray[this.backgroundImageIndex].width, gameLibrary.gameImageArray[this.backgroundImageIndex].height, COVER);
+            pop();
+            gameLibrary.endWebGLHUD();
+        }
+    }
 
-            // background
-            if (this.backgroundImageIndex != GameLibrary.NONE && gameLibrary.gameImageArray[this.backgroundImageIndex] != null) {
-                imageMode(CENTER);
-                image(gameLibrary.gameImageArray[this.backgroundImageIndex].image, gameLibrary.displayCenterPoint.x, gameLibrary.displayCenterPoint.y, gameLibrary.displayWidth, gameLibrary.displayHeight, 0, 0, gameLibrary.gameImageArray[this.backgroundImageIndex].width, gameLibrary.gameImageArray[this.backgroundImageIndex].height, COVER);
-            }
+    renderProgressBar() {
+        if (this.numberOfFiles > 0) {
+            gameLibrary.beginWebGLHUD();
+            push();
 
             let x = this.barRect.x + (this.barRect.width * 0.5);
             let y = this.barRect.y + (this.barRect.height * 0.5);
@@ -3433,7 +3447,13 @@ class GameLoadingScreen {
             }
 
             pop();
+            gameLibrary.endWebGLHUD();
         }
+    }
+
+    render() {
+        this.renderBackground();
+        this.renderProgressBar();
     }
 }
 

@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////
-// Game Library Version 2.1.20261109
+// Game Library Version 2.1.20261111
 // by Pheeraphat Sawangphian
 ////////////////////////////////////////////////////////////
 
@@ -15,6 +15,7 @@ class GameLibrary {
     static get SIN_90()                 {return -1.0;}
     static get COS_90()                 {return 0.0;}
     static get MAX_NUMBER_OF_IMAGES()   {return 200;}
+    static get MAX_NUMBER_OF_MODELS()   {return 200;}
 
     // button
     static get MAX_NUMBER_OF_BUTTONS()  {return 10;}
@@ -146,6 +147,8 @@ class GameLibrary {
         this.loadingScreen = new GameLoadingScreen();
         this.setupCooldown = 0;
         this.imageFilenameArray = [];
+        this.modelFilenameArray = [];
+        this.modelOptionArray = [];
         this.soundFilenameArray = [];
 
         // vector
@@ -211,6 +214,15 @@ class GameLibrary {
 
         for (let i = 0; i < GameLibrary.MAX_NUMBER_OF_IMAGES; i++) {
             this.gameImageArray[i] = null;
+        }
+
+        // models
+        this.modelLoadingIndex = 0;
+        this.numberOfModels = 0;
+        this.modelArray = [];
+
+        for (let i = 0; i < GameLibrary.MAX_NUMBER_OF_MODELS; i++) {
+            this.modelArray[i] = null;
         }
 
         // sounds
@@ -328,6 +340,64 @@ class GameLibrary {
     endWebGLHUD() {
         if (this.isWebGLEnabled) {
             drawingContext.enable(drawingContext.DEPTH_TEST);
+        }
+    }
+
+    remapUVToTextureSize(targetModel, oldTextureWidth = 0, oldTextureHeight = 0) {
+        if (targetModel.uvs && targetModel.uvs.length > 0) {
+            let minU = Infinity;
+            let maxU = -Infinity;
+            let minV = Infinity;
+            let maxV = -Infinity;
+
+            for (let i = 0; i < targetModel.uvs.length; i++) {
+                let uvPair = targetModel.uvs[i];
+
+                if (uvPair && uvPair.length >= 2) {
+                    let u = uvPair[0];
+                    let v = uvPair[1];
+
+                    if (u < minU) minU = u;
+                    if (u > maxU) maxU = u;
+                    if (v < minV) minV = v;
+                    if (v > maxV) maxV = v;
+                }
+            }
+
+            let uRange = maxU - minU;
+            let vRange = maxV - minV;
+
+            console.log("\nremapUVToTextureSize()");
+            console.log("uv min............................: (%f, %f)", minU, minV);
+            console.log("uv max............................: (%f, %f)", maxU, maxV);
+            console.log("uv range..........................: %f x %f", uRange, vRange);
+
+            if (oldTextureWidth > 0 && oldTextureHeight > 0) {
+                let pixelMinX = round(minU * oldTextureWidth);
+                let pixelMaxX = round(maxU * oldTextureWidth);
+                let pixelMinY = round(minV * oldTextureHeight);
+                let pixelMaxY = round(maxV * oldTextureHeight);
+                let pixelWidth = pixelMaxX - pixelMinX;
+                let pixelHeight = pixelMaxY - pixelMinY;
+
+                console.log("old texture size..................: %d x %d", oldTextureWidth, oldTextureHeight);
+                console.log("pixel top left....................: (%d, %d)", pixelMinX, pixelMinY);
+                console.log("pixel bottom right................: (%d, %d)", pixelMaxX, pixelMaxY);
+                console.log("pixel size........................: %d x %d", pixelWidth, pixelHeight);
+            }
+
+            console.log();
+
+            if (uRange > 0 && vRange > 0) {
+                for (let i = 0; i < targetModel.uvs.length; i++) {
+                    let uvPair = targetModel.uvs[i];
+
+                    if (uvPair && uvPair.length >= 2) {
+                        targetModel.uvs[i][0] = (targetModel.uvs[i][0] - minU) / uRange;
+                        targetModel.uvs[i][1] = (targetModel.uvs[i][1] - minV) / vRange;
+                    }
+                }
+            }
         }
     }
 
@@ -740,6 +810,24 @@ class GameLibrary {
         }
     }
 
+    addModelFilename(i, filename, options) {
+        if (filename != null && filename.length > 0) {
+            this.modelFilenameArray[i] = filename;
+
+            if (!filename.includes(".")) {
+                this.modelFilenameArray[i] += ".obj";
+            }
+
+            this.numberOfModels = this.modelFilenameArray.length;
+            this.modelOptionArray[i] = {
+                scale: { x: 1, y: 1, z: 1, ...options?.scale },
+                rotate: { x: 0, y: 0, z: 0, ...options?.rotate },
+                remapUVToTextureSize: typeof options?.remapUVToTextureSize === 'boolean' ? options.remapUVToTextureSize : false,
+                oldTextureSize: { width: 0, height: 0, ...options?.oldTextureSize }
+            };
+        }
+    }
+
     addSoundFilename(i, filename, extension = null) {
         if (filename != null && filename.length > 0) {
             this.soundFilenameArray[i] = filename;
@@ -1058,7 +1146,7 @@ class GameLibrary {
                     this.loadImages();
                 } else {
                     this.imageFilenameArray = null;
-                    this.loadSounds();
+                    this.loadModels();
                 }
             } else {
                 let filePath = this.getImageFilePath(this.imageLoadingIndex);
@@ -1074,12 +1162,66 @@ class GameLibrary {
                         this.loadImages();
                     } else {
                         this.imageFilenameArray = null;
-                        this.loadSounds();
+                        this.loadModels();
                     }
                 });
             }
         } else {
             this.imageFilenameArray = null;
+            this.loadModels();
+        }
+    }
+
+    loadModels() {
+        if (this.numberOfModels > 0) {
+            if (this.modelLoadingIndex == 0) {
+                console.log("\npreload model...");
+            }
+
+            let info = str(this.modelLoadingIndex + 1) + "/" + str(min(this.numberOfModels, GameLibrary.MAX_NUMBER_OF_MODELS)) + " " + this.modelFilenameArray[this.modelLoadingIndex];
+            console.log(info);
+
+            this.loadingScreen.fileIndex++;
+            this.loadingScreen.filename = this.modelFilenameArray[this.modelLoadingIndex];
+
+            loadModel(this.modelFilenameArray[this.modelLoadingIndex], loadedModel => {
+                if (loadedModel) {
+                    let options = this.modelOptionArray[this.modelLoadingIndex];
+
+                    if (options.remapUVToTextureSize) {
+                        this.remapUVToTextureSize(loadedModel, options.oldTextureSize.width, options.oldTextureSize.height);
+                    }
+
+                    this.modelArray[this.modelLoadingIndex] = buildGeometry(function() {
+                        scale(options.scale.x, options.scale.y, options.scale.z);
+
+                        if (options.rotate.x != 0.0) {
+                            rotateX(options.rotate.x);
+                        }
+
+                        if (options.rotate.y != 0.0) {
+                            rotateX(options.rotate.y);
+                        }
+
+                        if (options.rotate.z != 0.0) {
+                            rotateZ(options.rotate.z);
+                        }
+
+                        model(loadedModel);
+                    });
+                }
+
+                this.modelLoadingIndex++;
+
+                if (this.modelLoadingIndex < this.numberOfModels && this.modelLoadingIndex < GameLibrary.MAX_NUMBER_OF_MODELS) {
+                    this.loadImages();
+                } else {
+                    this.modelFilenameArray = null;
+                    this.loadSounds();
+                }
+            });
+        } else {
+            this.modelFilenameArray = null;
             this.loadSounds();
         }
     }
@@ -1317,7 +1459,7 @@ class GameLibrary {
 
     startLoading() {
         let numberOfFonts = (this.isWebGLEnabled || (this.hudFontFilename != null && this.hudFontFilename.length) > 0) ? 1 : 0;
-        let numberOfFiles = numberOfFonts + this.numberOfImages + this.sound.numberOfSounds;
+        let numberOfFiles = numberOfFonts + this.numberOfImages + this.numberOfModels + this.sound.numberOfSounds;
 
         this.loadingScreen.numberOfFiles = numberOfFiles;
         this.loadingScreen.isStarted = true;

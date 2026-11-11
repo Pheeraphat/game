@@ -1214,7 +1214,7 @@ class GameLibrary {
                 this.modelLoadingIndex++;
 
                 if (this.modelLoadingIndex < this.numberOfModels && this.modelLoadingIndex < GameLibrary.MAX_NUMBER_OF_MODELS) {
-                    this.loadImages();
+                    this.loadModels();
                 } else {
                     this.modelFilenameArray = null;
                     this.loadSounds();

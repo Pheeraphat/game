@@ -186,7 +186,7 @@ class GearLibrary {
     }
 
     newGame() {
-        if (this.startButton.gameImageIndex == GearLibrary.IMAGE_NEXT_LEVEL || this.level.currentLevel == this.level.getNumberOfLevels() - 1) {
+        if (this.isGameSuccess && (this.level.getNumberOfLevels() == 1 || this.startButton.gameImageIndex == GearLibrary.IMAGE_NEXT_LEVEL || (this.level.getNumberOfLevels() > 1 && this.level.currentLevel == this.level.getNumberOfLevels() - 1))) {
             this.board.startAngle.set(this.board.angle.x, this.board.angle.y);
             this.camera.zoomIn();
             this.isNextLevel = true;
@@ -199,7 +199,7 @@ class GearLibrary {
     gameSuccess() {
         if (!this.isGameSuccess) {
             this.isGameSuccess = true;
-            let gameImageIndex = (this.level.currentLevel == this.level.getNumberOfLevels() - 1) ? GearLibrary.IMAGE_START : GearLibrary.IMAGE_NEXT_LEVEL;
+            let gameImageIndex = (this.level.getNumberOfLevels() == 1 || this.level.currentLevel == this.level.getNumberOfLevels() - 1) ? GearLibrary.IMAGE_START : GearLibrary.IMAGE_NEXT_LEVEL;
             this.startButton.setGameImage(gameImageIndex);
             gameLibrary.sound.play(GearLibrary.SOUND_GAME_SUCCESS);
             gameLibrary.changeGameMode(GearLibrary.GAME_MODE_MENU);
@@ -230,8 +230,14 @@ class GearLibrary {
         fill(255);
         textAlign(LEFT, TOP);
         drawingContext.miterLimit = 2;
-        text("Level: " + str(this.level.currentLevel + 1) + " of " + str(this.level.getNumberOfLevels()), 0, 0);
-        text("Moves: " + this.board.moves, 0, textSize());
+        let y = gameLibrary.hudGap;
+
+        if (this.level.getNumberOfLevels() > 1) {
+            text("Level: " + str(this.level.currentLevel + 1) + " of " + str(this.level.getNumberOfLevels()), gameLibrary.hudGap, y);
+            y += textSize();
+        }
+
+        text("Moves: " + this.board.moves, gameLibrary.hudGap, y);
 
         gameLibrary.renderButton(GameLibrary.BUTTON_FULLSCREEN, GearLibrary.IMAGE_ENTER_FULLSCREEN_0);
 
@@ -380,6 +386,7 @@ class GearButton {
 
         this.rect = new GameRect();
         this.rect2 = new GameRect2();
+        this.initRect2 = new GameRect2();
         this.halfSize = new GameSize();
         this.stage = GearButton.STAGE_CLOSED;
         this.pressStartMilliseconds = 0;
@@ -429,6 +436,13 @@ class GearButton {
                 this.stage = GearButton.STAGE_OPEN;
                 break;
         }
+
+        let halfSize = new GameSize(this.gameImage.width * this.initScale * 0.5, this.gameImage.height * this.initScale * 0.5);
+
+        this.initRect2.left = this.rect.x - halfSize.width;
+        this.initRect2.right = this.rect.x + halfSize.width;
+        this.initRect2.top = this.rect.y - halfSize.height;
+        this.initRect2.bottom = this.rect.y + halfSize.height;
     }
 
     open() {
@@ -497,7 +511,7 @@ class GearButton {
         let isMouseOver = false;
 
         if (this.stage == GearButton.STAGE_OPENING || this.stage == GearButton.STAGE_OPEN || this.stage == GearButton.STAGE_PRESSING || this.stage == GearButton.STAGE_PRESSED) {
-            isMouseOver = (x >= this.rect2.left && x <= this.rect2.right && y >= this.rect2.top && y <= this.rect2.bottom);
+            isMouseOver = (x >= this.initRect2.left && x <= this.initRect2.right && y >= this.initRect2.top && y <= this.initRect2.bottom);
         }
 
         return isMouseOver;
@@ -548,14 +562,14 @@ class GearButton {
         }
 
         if (this.gameImage != null) {
-            this.rect.width = int(this.gameImage.width * this.scale);
-            this.rect.height = int(this.gameImage.height * this.scale);
-            this.halfSize.set(int(this.rect.width * 0.5), int(this.rect.height * 0.5));
+            this.rect.width = this.gameImage.width * this.scale;
+            this.rect.height = this.gameImage.height * this.scale;
+            this.halfSize.set(this.rect.width * 0.5, this.rect.height * 0.5);
 
-            this.rect2.left = this.rect.x - this.halfSize.width + 1;
-            this.rect2.right = this.rect.x + this.halfSize.width - 1;
-            this.rect2.top = this.rect.y - this.halfSize.height + 1;
-            this.rect2.bottom = this.rect.y + this.halfSize.height - 1;
+            this.rect2.left = this.rect.x - this.halfSize.width;
+            this.rect2.right = this.rect.x + this.halfSize.width;
+            this.rect2.top = this.rect.y - this.halfSize.height;
+            this.rect2.bottom = this.rect.y + this.halfSize.height;
         }
     }
 
@@ -993,7 +1007,7 @@ class GearBoard {
                     this.angle.x = lerp(this.startAngle.x, 0, gearLibrary.camera.easeTime);
                     this.angle.y = lerp(this.startAngle.y, 0, gearLibrary.camera.easeTime);
                 } else {
-                    if (++gearLibrary.level.currentLevel >= gearLibrary.level.getNumberOfLevels()) {
+                    if (gearLibrary.isGameSuccess && ++gearLibrary.level.currentLevel >= gearLibrary.level.getNumberOfLevels()) {
                         gearLibrary.level.currentLevel = 0;
                     }
 

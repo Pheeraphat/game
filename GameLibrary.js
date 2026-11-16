@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////
-// Game Library Version 2.1.20261111
+// Game Library Version 2.1.20261116
 // by Pheeraphat Sawangphian
 ////////////////////////////////////////////////////////////
 
@@ -2305,97 +2305,124 @@ class GameLibrary {
 // data types
 ////////////////////////////////////////////////////////////
 class GamePoint {
-    constructor(x = 0, y = 0) {
-        this.set(x, y);
+    constructor(x = 0, y = 0, z = 0) {
+        this.set(x, y, z);
     }
 
-    set(x, y) {
+    set(x, y, z = 0) {
         this.x = x;
         this.y = y;
+        this.z = z;
     }
 
     scale(factor, isCastToInt = false) {
         let x = this.x;
         let y = this.y;
+        let z = this.z;
 
         if (typeof factor === "number") {
             x *= factor;
             y *= factor;
+            z *= factor;
         }
 
-        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y);
+        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y, isCastToInt ? int(z) : z);
     }
 
     mult(value, isCastToInt = false) {
         let x = this.x;
         let y = this.y;
+        let z = this.z;
 
-        if (value instanceof GamePoint) {
+        if (value instanceof GamePoint || value instanceof GameSize) {
             x *= value.x;
             y *= value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            z *= value.z;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            x *= value.x;
+            y *= value.y;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             x *= value.width;
             y *= value.height;
         } else if (typeof value === "number") {
             x *= value;
             y *= value;
+            z *= value;
         }
 
-        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y);
+        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y, isCastToInt ? int(z) : z);
     }
 
     div(value, isCastToInt = false) {
         let x = this.x;
         let y = this.y;
+        let z = this.z;
 
-        if (value instanceof GamePoint) {
+        if (value instanceof GamePoint || value instanceof GameSize) {
             x = (value.x == 0) ? x : x / value.x;
             y = (value.y == 0) ? y : y / value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            z = (value.z == 0) ? z : z / value.z;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            x = (value.x == 0) ? x : x / value.x;
+            y = (value.y == 0) ? y : y / value.y;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             x = (value.width == 0) ? x : x / value.width;
             y = (value.height == 0) ? y : y / value.height;
         } else if (typeof value === "number") {
             x = (value == 0) ? x : x / value;
             y = (value == 0) ? y : y / value;
+            z = (value == 0) ? z : z / value;
         }
 
-        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y);
+        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y, isCastToInt ? int(z) : z);
     }
 
     add(value, isCastToInt = false) {
         let x = this.x;
         let y = this.y;
+        let z = this.z;
 
-        if (value instanceof GamePoint) {
+        if (value instanceof GamePoint || value instanceof GameSize) {
             x += value.x;
             y += value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            z += value.z;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            x += value.x;
+            y += value.y;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             x += value.width;
             y += value.height;
         } else if (typeof value === "number") {
             x += value;
             y += value;
+            z += value;
         }
 
-        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y);
+        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y, isCastToInt ? int(z) : z);
     }
 
     sub(value, isCastToInt = false) {
         let x = this.x;
         let y = this.y;
+        let z = this.z;
 
-        if (value instanceof GamePoint) {
+        if (value instanceof GamePoint || value instanceof GameSize) {
             x -= value.x;
             y -= value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            z -= value.z;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            x -= value.x;
+            y -= value.y;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             x -= value.width;
             y -= value.height;
         } else if (typeof value === "number") {
             x -= value;
             y -= value;
+            z -= value;
         }
 
-        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y);
+        return new GamePoint(isCastToInt ? int(x) : x, isCastToInt ? int(y) : y, isCastToInt ? int(z) : z);
     }
 }
 
@@ -2423,100 +2450,239 @@ class GameRect2 {
         this.right = right;
         this.bottom = bottom;
     }
+
+    get x1() {
+        return this.left;
+    }
+
+    set x1(value) {
+        this.left = value;
+    }
+
+    get y1() {
+        return this.top;
+    }
+
+    set y1(value) {
+        this.top = value;
+    }
+
+    get x2() {
+        return this.right;
+    }
+
+    set x2(value) {
+        this.right = value;
+    }
+
+    get y2() {
+        return this.bottom;
+    }
+
+    set y2(value) {
+        this.bottom = value;
+    }
+
+    get x() {
+        return this.left;
+    }
+
+    get y() {
+        return this.top;
+    }
+
+    get width() {
+        return abs(this.right - this.left);
+    }
+
+    get height() {
+        return abs(this.bottom - this.top);
+    }
 }
 
 class GameSize {
-    constructor(width = 0, height = 0) {
-        this.set(width, height);
+    constructor(width = 0, height = 0, depth = 0) {
+        this.set(width, height, depth);
     }
 
-    set(width, height) {
-        this.width = width;
-        this.height = height;
+    set(width, height, depth = 0) {
+        this._width = width;
+        this._height = height;
+        this._depth = depth;
+    }
+
+    get width() {
+        return this._width;
+    }
+
+    set width(value) {
+        this._width = value;
+    }
+
+    get height() {
+        return this._height;
+    }
+
+    set height(value) {
+        this._height = value;
+    }
+
+    get depth() {
+        return this._depth;
+    }
+
+    set depth(value) {
+        this._depth = value;
+    }
+
+    get x() {
+        return this._width;
+    }
+
+    set x(value) {
+        this._width = value;
+    }
+
+    get y() {
+        return this._height;
+    }
+
+    set y(value) {
+        this._height = value;
+    }
+
+    get z() {
+        return this._depth;
+    }
+
+    set z(value) {
+        this._depth = value;
     }
 
     scale(factor, isCastToInt = false) {
-        let w = this.width;
-        let h = this.height;
+        let w = this._width;
+        let h = this._height;
+        let d = this._depth;
 
         if (typeof factor === "number") {
             w *= factor;
             h *= factor;
+            d *= factor;
         }
 
-        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h);
+        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h, isCastToInt ? int(d) : d);
     }
 
     mult(value, isCastToInt = false) {
-        let w = this.width;
-        let h = this.height;
+        let w = this._width;
+        let h = this._height;
+        let d = this._depth;
 
         if (value instanceof GamePoint) {
             w *= value.x;
             h *= value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            d *= value.z;
+        } else if (value instanceof GameSize) {
+            w *= value.width;
+            h *= value.height;
+            d *= value.depth;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            w *= value.width;
+            h *= value.height;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             w *= value.width;
             h *= value.height;
         } else if (typeof value === "number") {
             w *= value;
             h *= value;
+            d *= value;
         }
 
-        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h);
+        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h, isCastToInt ? int(d) : d);
     }
 
     div(value, isCastToInt = false) {
-        let w = this.width;
-        let h = this.height;
+        let w = this._width;
+        let h = this._height;
+        let d = this._depth;
 
         if (value instanceof GamePoint) {
             w = (value.x == 0) ? w : w / value.x;
             h = (value.y == 0) ? h : h / value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            d = (value.z == 0) ? d : d / value.z;
+        } else if (value instanceof GameSize) {
+            w = (value.width == 0) ? w : w / value.width;
+            h = (value.height == 0) ? h : h / value.height;
+            d = (value.depth == 0) ? d : d / value.depth;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            w = (value.width == 0) ? w : w / value.width;
+            h = (value.height == 0) ? h : h / value.height;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             w = (value.width == 0) ? w : w / value.width;
             h = (value.height == 0) ? h : h / value.height;
         } else if (typeof value === "number") {
             w = (value == 0) ? w : w / value;
             h = (value == 0) ? h : h / value;
+            d = (value == 0) ? d : d / value;
         }
 
-        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h);
+        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h, isCastToInt ? int(d) : d);
     }
 
     add(value, isCastToInt = false) {
-        let w = this.width;
-        let h = this.height;
+        let w = this._width;
+        let h = this._height;
+        let d = this._depth;
 
         if (value instanceof GamePoint) {
             w += value.x;
             h += value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            d += value.z;
+        } else if (value instanceof GameSize) {
+            w += value.width;
+            h += value.height;
+            d += value.depth;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            w += value.width;
+            h += value.height;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             w += value.width;
             h += value.height;
         } else if (typeof value === "number") {
             w += value;
             h += value;
+            d += value;
         }
 
-        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h);
+        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h, isCastToInt ? int(d) : d);
     }
 
     sub(value, isCastToInt = false) {
-        let w = this.width;
-        let h = this.height;
+        let w = this._width;
+        let h = this._height;
+        let d = this._depth;
 
         if (value instanceof GamePoint) {
             w -= value.x;
             h -= value.y;
-        } else if (value instanceof GameSize || value instanceof p5.Graphics || value instanceof p5.Image) {
+            d -= value.z;
+        } else if (value instanceof GameSize) {
+            w -= value.width;
+            h -= value.height;
+            d -= value.depth;
+        } else if (value instanceof GameRect || value instanceof GameRect2) {
+            w -= value.width;
+            h -= value.height;
+        } else if (value instanceof p5.Graphics || value instanceof p5.Image) {
             w -= value.width;
             h -= value.height;
         } else if (typeof value === "number") {
             w -= value;
             h -= value;
+            d -= value;
         }
 
-        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h);
+        return new GameSize(isCastToInt ? int(w) : w, isCastToInt ? int(h) : h, isCastToInt ? int(d) : d);
     }
 }
 

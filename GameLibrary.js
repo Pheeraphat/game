@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////
-// Game Library Version 2.1.20261116
+// Game Library Version 2.1.20261117
 // by Pheeraphat Sawangphian
 ////////////////////////////////////////////////////////////
 
@@ -4165,12 +4165,15 @@ class GameParticle {
 
         element.centerVector.x = position.x;
         element.centerVector.y = position.y;
+        element.centerVector.z = position.z;
 
         element.accelerationVector.x = acceleration.x;
         element.accelerationVector.y = acceleration.y;
+        element.accelerationVector.z = acceleration.z;
 
         element.velocityVector.x = velocity.x;
         element.velocityVector.y = velocity.y;
+        element.velocityVector.z = velocity.z;
 
         element.size = size;
         element.sizeChanged = sizeChanged;
@@ -4188,6 +4191,7 @@ class GameParticle {
         let halfSize = element.size * 0.5;
         element.topLeftPoint.x = element.centerVector.x - halfSize;
         element.topLeftPoint.y = element.centerVector.y - halfSize;
+        element.topLeftPoint.z = element.centerVector.z - halfSize;
 
         this.elementArray.push(element);
     }
@@ -4289,7 +4293,7 @@ class GameParticle {
         this.elementArray[i].topLeftPoint.x = this.elementArray[i].centerVector.x - halfSize;
         this.elementArray[i].topLeftPoint.y = this.elementArray[i].centerVector.y - halfSize;
 
-        if (halfSize <= 0.0 || this.elementArray[i].centerVector.x < -halfSize || this.elementArray[i].centerVector.x > this.parent.offscreen.displayWidth + halfSize || this.elementArray[i].centerVector.y < -halfSize || this.elementArray[i].centerVector.y > this.parent.offscreen.displayHeight + halfSize) {
+        if (halfSize <= 0.0 || (!this.parent.isWebGLEnabled && (this.elementArray[i].centerVector.x < -halfSize || this.elementArray[i].centerVector.x > this.parent.offscreen.displayWidth + halfSize || this.elementArray[i].centerVector.y < -halfSize || this.elementArray[i].centerVector.y > this.parent.offscreen.displayHeight + halfSize))) {
             this.elementArray[i].lifespan = 0.0;
             this.elementArray.splice(i, 1);
             isDead = true;

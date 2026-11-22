@@ -203,9 +203,7 @@ class RubADubLibrary {
         this.buttonPlayImageIndex = RubADubLibrary.IMAGE_NEW_GAME_0;
 
         // blink
-        this.blinkElapsedTime = 0;
-        this.blinkInterval = 0;
-        this.blinkDuration = 0;
+        this.levelBlink = new RubADubBlink(500, 3000);
 
         // hud
         this.pixelsBetweenWords = 0;
@@ -219,30 +217,28 @@ class RubADubLibrary {
         this.level = new RubADubLevel();
     }
 
-    blink(blinkInterval, blinkDuration) {
-        this.blinkElapsedTime = 0;
-        this.blinkInterval = blinkInterval;
-        this.blinkDuration = blinkDuration;
-    }
-
     canCheckCollision() {
         return (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU && !this.isMotionFrozen() && !this.isGameFinished && !this.level.isClearingBlocks);
     }
 
     finishGame() {
-        this.isGameOver = false;
-        this.isGameFinished = true;
-        this.infoType = RubADubLibrary.INFO_TYPE_FINISHED;
-        gameLibrary.sound.play(RubADubLibrary.SOUND_FINISHED);
-        gameLibrary.changeGameMode(RubADubLibrary.GAME_MODE_MENU);
+        if (!this.isGameFinished) {
+            this.isGameOver = false;
+            this.isGameFinished = true;
+            this.infoType = RubADubLibrary.INFO_TYPE_FINISHED;
+            gameLibrary.sound.play(RubADubLibrary.SOUND_FINISHED);
+            gameLibrary.changeGameMode(RubADubLibrary.GAME_MODE_MENU);
+        }
     }
 
     gameOver() {
-        this.isGameOver = true;
-        this.isGameFinished = false;
-        this.infoType = RubADubLibrary.INFO_TYPE_GAME_OVER;
-        gameLibrary.sound.play(RubADubLibrary.SOUND_GAME_OVER);
-        gameLibrary.changeGameMode(RubADubLibrary.GAME_MODE_MENU);
+        if (!this.isGameOver) {
+            this.isGameOver = true;
+            this.isGameFinished = false;
+            this.infoType = RubADubLibrary.INFO_TYPE_GAME_OVER;
+            gameLibrary.sound.play(RubADubLibrary.SOUND_GAME_OVER);
+            gameLibrary.changeGameMode(RubADubLibrary.GAME_MODE_MENU);
+        }
     }
 
     getDeltaTime() {
@@ -278,7 +274,7 @@ class RubADubLibrary {
 
         if (this.isNewGame) {
             if (!this.isJustStarted) {
-                this.blink(500, 3000);
+                this.levelBlink.start();
 
                 if (!this.isTryAgain) {
                     this.level.isLoadFirstLevel = true;
@@ -381,18 +377,9 @@ class RubADubLibrary {
 
         // level
         if (this.level.numberOfLevels > 1) {
-            let isVisibled = true;
+            this.levelBlink.update();
 
-            if (this.blinkInterval > 0 && this.blinkDuration > 0) {
-                isVisibled = gameLibrary.getMilliseconds() % this.blinkInterval < this.blinkInterval * 0.5;
-                this.blinkElapsedTime += this.getDeltaTime();
-
-                if (this.blinkElapsedTime >= this.blinkDuration) {
-                    this.blink(0, 0);
-                }
-            }
-
-            if (isVisibled) {
+            if (this.levelBlink.isVisibled) {
                 let levelString = str(this.level.currentLevel + 1) + "/" + str(this.level.numberOfLevels);
                 let levelStringSize = gameLibrary.number.getPixelSize(levelString, RubADubLibrary.IMAGE_DIGIT_0, this.spacesBetweenDigits);
                 let totalWidth = this.levelScaledSize.width + this.pixelsBetweenWords + levelStringSize.width;
@@ -458,6 +445,38 @@ class RubADubLibrary {
 }
 
 ////////////////////////////////////////////////////////////
+// blink
+////////////////////////////////////////////////////////////
+class RubADubBlink {
+    constructor(interval, duration) {
+        this.interval = interval;
+        this.duration = duration;
+        this.elapsedTime = this.duration;
+        this.isBlinking = false;
+        this.isVisibled = true;
+    }
+
+    start() {
+        this.elapsedTime = 0;
+        this.isBlinking = true;
+    }
+
+    update() {
+        this.isVisibled = true;
+
+        if (this.elapsedTime < this.duration) {
+            this.isVisibled = (gameLibrary.getMilliseconds() % this.interval) < (this.interval * 0.5);
+            this.elapsedTime += rubADubLibrary.getDeltaTime();
+
+            if (this.elapsedTime >= this.duration) {
+                this.elapsedTime = this.duration;
+                this.isBlinking = false;
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////
 // model
 ////////////////////////////////////////////////////////////
 class RubADubModel {
@@ -501,6 +520,7 @@ class RubADubModel {
         this.position.y = y;
 
         let level = rubADubLibrary.level;
+        this.alpha = 0;
 
         if (this.position.x >= level.pool.farLeftBlockPosition.x && this.position.x <= level.pool.nearRightBlockPosition.x) {
             let maxWidth = RubADubLevel.FADING_BLOCKS * level.block.size.x;
@@ -580,12 +600,12 @@ class RubADubBlock extends RubADubModel {
             let overlapX = halfWidth - Math.abs(dx);
             let overlapY = halfHeight - Math.abs(dy);
 
-            let isDuckCenterInside = abs(dx) <= this.halfSize.x;
+            let isDuckCenterInside = abs(dx) <= this.halfSize.x * 1.5;
             let isDuckStandingOn = (duck.position.y == this.position.y - this.halfSize.y - duck.halfSize.y) && isDuckCenterInside;
             let isTouchingDuck = (overlapX > 0 && overlapY > 0) || isDuckStandingOn;
 
             if (isTouchingDuck) {
-                if (isDuckStandingOn || (overlapX > overlapY && isDuckCenterInside) || (duck.isJumping && duck.jumpVelocity >= 0)) {
+                if (isDuckStandingOn || (overlapX > overlapY && isDuckCenterInside) || (duck.isJumping && duck.jumpVelocity >= 0 && dy < 0 && isDuckCenterInside)) {
                     if (isDuckStandingOn || dy < 0) { // upper
                         duck.setOnBlock(this);
                     } else { // under
@@ -748,6 +768,7 @@ class RubADubCamera {
         let smoothFactor = 1 - exp((this.isResetting ? -0.005 : -0.001) * dt);
         let lookAtSmoothFactor = smoothFactor;
 
+        // move camera up to duck y position
         if (this.autoDriftConfig.duck == null) {
             let level = rubADubLibrary.level;
             let cameraHeightRange = (this.defaultState.lookAtHeight * 3) * level.block.size.y;
@@ -761,41 +782,45 @@ class RubADubCamera {
             }
         }
 
-        this.lookAt.x = lerp(this.lookAt.x, this.autoDriftConfig.lookAt.x, lookAtSmoothFactor);
-        this.lookAt.y = lerp(this.lookAt.y, this.autoDriftConfig.lookAt.y, lookAtSmoothFactor);
-        this.lookAt.z = lerp(this.lookAt.z, this.autoDriftConfig.lookAt.z, lookAtSmoothFactor);
+        let distLookAt = 0;
+        let isReset = false;
 
-        let distLookAt = dist(this.lookAt.x, this.lookAt.y, this.lookAt.z, this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
+        if (this.lookAt.x != this.autoDriftConfig.lookAt.x && this.lookAt.y != this.autoDriftConfig.lookAt.y && this.lookAt.z != this.autoDriftConfig.lookAt.z) {
+            this.lookAt.x = lerp(this.lookAt.x, this.autoDriftConfig.lookAt.x, lookAtSmoothFactor);
+            this.lookAt.y = lerp(this.lookAt.y, this.autoDriftConfig.lookAt.y, lookAtSmoothFactor);
+            this.lookAt.z = lerp(this.lookAt.z, this.autoDriftConfig.lookAt.z, lookAtSmoothFactor);
 
-        if (distLookAt < 0.1) {
-            this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
+            distLookAt = dist(this.lookAt.x, this.lookAt.y, this.lookAt.z, this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
+
+            if (distLookAt < 0.1) {
+                this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
+                distLookAt = 0;
+            }
         }
 
         if (this.isResetting || (this.isAutoDrifting && !this.isDragging)) {
             if (this.isResetting) {
-                if (this.targetZoom != this.defaultState.zoom) {
-                    this.targetZoom = lerp(this.targetZoom, this.defaultState.zoom, smoothFactor);
-
-                    if (abs(this.targetZoom - this.defaultState.zoom) < 0.1) {
-                        this.targetZoom = this.defaultState.zoom;
-                    }
-                }
-
-                this.angle.x = this.lerpAngle(this.angle.x, this.defaultState.angle.x, smoothFactor);
-                this.angle.y = this.lerpAngle(this.angle.y, this.defaultState.angle.y, smoothFactor);
-
-                let diffX = abs(((this.defaultState.angle.x - this.angle.x + PI) % TWO_PI + TWO_PI) % TWO_PI - PI);
-                let diffY = abs(((this.defaultState.angle.y - this.angle.y + PI) % TWO_PI + TWO_PI) % TWO_PI - PI);
-
-                if (distLookAt < 0.1 && abs(this.zoom - this.defaultState.zoom) < 0.1 && diffX < 0.005 && diffY < 0.005) {
+//                if (this.targetZoom != this.defaultState.zoom) {
+//                    this.targetZoom = lerp(this.targetZoom, this.defaultState.zoom, smoothFactor);
+//
+//                    if (abs(this.targetZoom - this.defaultState.zoom) < 0.1) {
+//                        this.targetZoom = this.defaultState.zoom;
+//                    }
+//                }
+//
+//                this.angle.x = this.lerpAngle(this.angle.x, this.defaultState.angle.x, smoothFactor);
+//                this.angle.y = this.lerpAngle(this.angle.y, this.defaultState.angle.y, smoothFactor);
+//
+//                let diffX = abs(((this.defaultState.angle.x - this.angle.x + PI) % TWO_PI + TWO_PI) % TWO_PI - PI);
+//                let diffY = abs(((this.defaultState.angle.y - this.angle.y + PI) % TWO_PI + TWO_PI) % TWO_PI - PI);
+//
+//                if (distLookAt == 0 && abs(this.zoom - this.defaultState.zoom) < 0.1 && diffX < 0.005 && diffY < 0.005) {
                     this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
-                    this.zoom = this.defaultState.zoom;
                     this.targetZoom = this.defaultState.zoom;
+                    this.zoom = this.targetZoom;
                     this.angle.set(this.defaultState.angle.x, this.defaultState.angle.y, this.defaultState.angle.z);
                     this.isResetting = false;
-                    rubADubLibrary.isGameFinished = false;
-                    rubADubLibrary.isGameOver = false;
-                }
+//                }
             } else {
                 this.autoDriftConfig.driftBlend = min(this.autoDriftConfig.driftBlend + (0.0007 * dt), 1.0);
 
@@ -813,19 +838,20 @@ class RubADubCamera {
             }
         }
 
-        perspective(this.fov, gameLibrary.displayWidth / gameLibrary.displayHeight, 0.01, 2000);
+        if (this.zoom != this.targetZoom) {
+            let zoomSmoothFactor = smoothFactor * 10;
+            this.zoom = lerp(this.zoom, this.targetZoom, zoomSmoothFactor);
 
-        let zoomSmoothFactor = smoothFactor * 10;
-        this.zoom = lerp(this.zoom, this.targetZoom, zoomSmoothFactor);
-
-        if (abs(this.zoom - this.defaultState.zoom) < 0.1) {
-            this.zoom = this.defaultState.zoom;
+            if (abs(this.zoom - this.targetZoom) < 0.1) {
+                this.zoom = this.targetZoom;
+            }
         }
 
         this.position.x = this.lookAt.x - this.zoom * cos(this.angle.x) * sin(this.angle.y);
         this.position.y = this.lookAt.y + this.zoom * sin(this.angle.x);
         this.position.z = this.lookAt.z + this.zoom * cos(this.angle.x) * cos(this.angle.y);
 
+        perspective(this.fov, gameLibrary.displayWidth / gameLibrary.displayHeight, 0.01, 2000);
         camera(this.position.x, this.position.y, this.position.z, this.lookAt.x, this.lookAt.y, this.lookAt.z, 0, 1, 0);
     }
 
@@ -866,7 +892,7 @@ class RubADubCamera {
 // duck
 ////////////////////////////////////////////////////////////
 class RubADubDuck extends RubADubModel {
-    static get JUMP_HEIGHT_BLOCKS()      {return   2;}
+    static get JUMP_HEIGHT_BLOCKS()      {return 1.5;}
     static get JUMP_SPAN_BLOCKS()        {return   4;}
     static get START_BLOCK_OFFSET()      {return  -3;}
 
@@ -899,6 +925,8 @@ class RubADubDuck extends RubADubModel {
     }
 
     initCollisionSize() {
+        this.size.y = rubADubLibrary.level.block.size.y;
+        this.halfSize.y = rubADubLibrary.level.block.halfSize.y;
         this.collisionSize.x = this.size.x * 0.96;
         this.collisionHalfSize = gameLibrary.vector.scale(this.collisionSize, 0.5);
     }
@@ -1042,27 +1070,25 @@ class RubADubLevel {
         this.dataArray = [];
 
         // 1
-        this.dataArray.push(["        O        O                           O",
-                             "  O                                           ",
-                             "X       A       XXX    AA       XAA      X    ",
+        this.dataArray.push(["                                         O",
+                             "                                          ",
+                             "X      A      XXXXX    AA     XAA      X  ",
                             ]);
 
         // 2
-        this.dataArray.push(["                                                       ",
-                             "                                                       ",
-                             "                   O                                   ",
-                             "                                      XXXXX            ",
-                             "A    AA     X    X    X     X     A           AAAXAA  X"
+        this.dataArray.push(["                  O                        ",
+                             "                            XXXXX          ",
+                             "A    AA     X   X   X   A           AAXAA X"
                             ]);
 
         // 3
-        this.dataArray.push(["                     XAA  X               A                                    ",
-                             "            XXXXXXXX       O    X         X                                    ",
-                             "        X                             X                                        ",
-                             "    X                   XXX   XXXX       X                                     ",
-                             "X   A                    A        AAAAAAA   X     A    A    A     XAAA     AX A"
+        this.dataArray.push(["                 XXAA X             A                                   ",
+                             "         XXXXX         O   X        X                                   ",
+                             "      X                         X                                       ",
+                             "   X             XXXXXX   XXXX     X                                    ",
+                             "X  A                  A       AAAAA   X    A    A    A     XAAA     AX A"
                             ]);
-
+/*
         // 4
         this.dataArray.push(["                                                              X                                                                  ",
                              "                                                          X   O     A                                                            ",
@@ -1138,7 +1164,7 @@ class RubADubLevel {
                              "    AXXXXXXXXX                   A                        A            A                                     A                                        AXXXX                                      ",
                              "XXX           AAAAA              X                        X            X                                     X                                            AAAAA               XAAAAX          AAA",
                             ]);
-
+*/
         this.time = 0;
         this.duckType = 0;
         this.duck = null;
@@ -1164,7 +1190,7 @@ class RubADubLevel {
         this.totalCollectedDucklings = 0;
         this.visibledDucklingArray = [];
         this.duckYArray = [];
-        this.ducklingMoveDelay = 5;
+        this.ducklingMoveDelay = 6;
         this.maxDucklings = 0;
 
         for (let level = 0; level < this.numberOfLevels; level++) {
@@ -1234,7 +1260,7 @@ class RubADubLevel {
             this.duckling = new RubADubDuckling();
             this.spike = new RubADubSpike();
 
-            this.load(this.currentLevel);
+            this.load(0);
             this.duck.init();
         }
     }
@@ -1252,7 +1278,7 @@ class RubADubLevel {
     next() {
         if (this.currentLevel < this.lastLevel) {
             this.load(this.currentLevel + 1);
-            rubADubLibrary.blink(500, 3000);
+            rubADubLibrary.levelBlink.start();
         } else {
             rubADubLibrary.finishGame();
         }
@@ -1286,7 +1312,7 @@ class RubADubLevel {
         // block
         this.isBlockCollisionChecked = false;
 
-        if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU) {
+        if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU && !rubADubLibrary.levelBlink.isBlinking) {
             this.blockMoveLength += this.pool.water.moveTime;
         }
 
@@ -1326,16 +1352,18 @@ class RubADubLevel {
 
         this.duck.render();
 
-        if (this.blockMoveLength >= this.maxBlockMoveLength || (this.isClearingBlocks && this.clearingBlocksFactor == 0)) {
-            if (this.isClearingBlocks) {
-                this.clearBlocks(false);
-                this.resetData();
-            } else if (!this.isLoadFirstLevel) {
-                this.next();
-            }
+        if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU) {
+            if (this.blockMoveLength >= this.maxBlockMoveLength || (this.isClearingBlocks && this.clearingBlocksFactor == 0)) {
+                if (this.isClearingBlocks) {
+                    this.clearBlocks(false);
+                    this.resetData();
+                } else if (!this.isLoadFirstLevel) {
+                    this.next();
+                }
 
-            if (this.isLoadFirstLevel) {
-                this.load(0);
+                if (this.isLoadFirstLevel) {
+                    this.load(0);
+                }
             }
         }
         pop();

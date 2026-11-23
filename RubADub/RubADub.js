@@ -737,17 +737,17 @@ class RubADubCamera {
     }
 
     lerpAngle(current, target, amount) {
-        let diff = gameLibrary.warpValue(target - current + PI, TWO_PI) - PI;
-        return gameLibrary.warpValue(current + diff * amount, TWO_PI);
+        let diff = gameLibrary.warpValue(target - current + PI, 0, TWO_PI) - PI;
+        return gameLibrary.warpValue(current + diff * amount, 0, TWO_PI);
     }
 
     applyCameraInput(deltaX, deltaY, scrollDelta, dt) {
         let speed = this.rotationSpeed * dt * ((gameLibrary.targetFrameRate > 0) ? (gameLibrary.targetFrameRate / gameLibrary.defaultFrameRate) : 1);
-        this.angle.y = gameLibrary.warpValue(this.angle.y + (deltaX * speed), TWO_PI);
+        this.angle.y = gameLibrary.warpValue(this.angle.y + (deltaX * speed), 0, TWO_PI);
 
         let signedAngleX = (this.angle.x > PI) ? this.angle.x - TWO_PI : this.angle.x;
         signedAngleX = constrain(signedAngleX - deltaY * speed, -this.autoDriftConfig.maxUpAngle, this.autoDriftConfig.maxDownAngle);
-        this.angle.x = gameLibrary.warpValue(signedAngleX, TWO_PI);
+        this.angle.x = gameLibrary.warpValue(signedAngleX, 0, TWO_PI);
 
         this.targetZoom = constrain(this.targetZoom + scrollDelta, this.autoDriftConfig.minZoom, this.autoDriftConfig.maxZoom);
     }

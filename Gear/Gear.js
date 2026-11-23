@@ -134,16 +134,6 @@ class GearLibrary {
         this.initStartButton();
     }
 
-    calculateAngle(angle, maxAngle) {
-        angle %= maxAngle;
-
-        if (angle < 0.0) {
-            angle += TWO_PI;
-        }
-
-        return angle;
-    }
-
     easeInOutLinear(t, easeInPhase = 0.1, easeOutPhase = 0.9) {
         let denom = 2 - easeInPhase - easeOutPhase;
 
@@ -705,7 +695,7 @@ class Gear8Teeth {
 
     mesh(startAngle, targetAngle) {
         if (startAngle > targetAngle) {
-            startAngle = gearLibrary.calculateAngle(this.angle, this.stepAngle);
+            startAngle = gameLibrary.warpValue(this.angle, 0, this.stepAngle);
         }
 
         this.t = 0.0;
@@ -1026,7 +1016,7 @@ class GearBoard {
             }
         }
 
-        this.globalGearAngle = gearLibrary.calculateAngle(this.globalGearAngle + (this.globalGearSpeed * deltaTime), TWO_PI);
+        this.globalGearAngle = gameLibrary.warpValue(this.globalGearAngle + (this.globalGearSpeed * deltaTime), 0, TWO_PI);
         this.isBlockMoving = false;
 
         let totalGears = 0;
@@ -1168,7 +1158,7 @@ class GearBoard {
                     let initialAngle = block.isOddBlock ? block.frontGear.stepAngle : 0;
 
                     if (block.frontGear.isSpinning) {
-                        block.frontGear.setAngle(gearLibrary.calculateAngle(initialAngle + (block.frontGear.directionSign * this.globalGearAngle), TWO_PI));
+                        block.frontGear.setAngle(gameLibrary.warpValue(initialAngle + (block.frontGear.directionSign * this.globalGearAngle), 0, TWO_PI));
                     } else if (this.findNeighborGear(row, column, block.frontGear) != null) {
                         this.meshGear(block.frontGear, block.backGear, initialAngle);
                     }
@@ -1178,7 +1168,7 @@ class GearBoard {
                     let initialAngle = block.isOddBlock ? block.backGear.stepAngle : 0;
 
                     if (block.backGear.isSpinning) {
-                        block.backGear.setAngle(gearLibrary.calculateAngle(initialAngle + (block.backGear.directionSign * this.globalGearAngle), TWO_PI));
+                        block.backGear.setAngle(gameLibrary.warpValue(initialAngle + (block.backGear.directionSign * this.globalGearAngle), 0, TWO_PI));
                     } else if (this.findNeighborGear(row, column, block.backGear) != null) {
                         this.meshGear(block.backGear, block.frontGear, initialAngle);
                     }

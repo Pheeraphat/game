@@ -455,7 +455,7 @@ class GameLibrary {
     }
 
     // utilities
-    warpValue(value, maxValue, minValue = 0) {
+    warpValue(value, minValue, maxValue) {
         let range = maxValue - minValue;
 
         value = (value - minValue) % range;

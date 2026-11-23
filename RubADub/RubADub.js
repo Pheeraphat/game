@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////
-// วิธีเล่นเกมเป็ดยาง (Rub-a-Dub)
+// วิธีเล่นเกมเป็ดยางในสระน้ำ (Rub-a-Dub)
 //
-// 1. คลิ้กเพื่อให้เป็ดกระโดดไปตามทาง
+// 1. คลิ้กหน้าจอหรือกดปุ่ม Spacebar เพื่อให้เป็ดกระโดดไปตามกล่อง
 // 2. ห้ามชนกล่องและหนาม
 // 3. สามารถเก็บลูกเป็ดตามทางให้ได้มากที่สุด
 ////////////////////////////////////////////////////////////
@@ -488,6 +488,8 @@ class RubADubModel {
         this.size = gameLibrary.vector.create();
         this.halfSize = gameLibrary.vector.create();
         this.position = gameLibrary.vector.create();
+        this.offset = gameLibrary.vector.create();
+        this.angle = gameLibrary.vector.create();
         this.collisionSize = gameLibrary.vector.create();
         this.collisionHalfSize = gameLibrary.vector.create();
 
@@ -541,7 +543,10 @@ class RubADubModel {
             }
 
             push();
-            translate(this.position.x, this.position.y, 0);
+            translate(this.position.x + this.offset.x, this.position.y + this.offset.y, 0 + this.offset.z);
+            rotateX(this.angle.x);
+            rotateY(this.angle.y);
+            rotateZ(this.angle.z);
             noStroke();
 
             this.alpha = gameLibrary.clamp(this.alpha, 0, 255)
@@ -895,10 +900,16 @@ class RubADubDuck extends RubADubModel {
     constructor() {
         super(RubADubLibrary.MODEL_MOM, RubADubLibrary.TEXTURE_MOM);
 
+        this.isJumping = false;
         this.jumpGravity = 0;
         this.jumpForce = 0;
         this.jumpVelocity = 0;
-        this.isJumping = false;
+        this.jumpAirTime = 0;
+
+        this.isFrontFlipping = false;
+        this.frontFlipVelocity = 0;
+        this.timeToFrontFlip = 0;
+
         this.isHit = false;
         this.onWaterY = 0;
 
@@ -953,10 +964,15 @@ class RubADubDuck extends RubADubModel {
         let jumpHeight = RubADubDuck.JUMP_HEIGHT_BLOCKS * rubADubLibrary.level.block.size.y;
         let jumpDuration = (RubADubDuck.JUMP_SPAN_BLOCKS / RubADubLevel.BOXES_MOVE_PER_SEC) * 1000;
         let timeToPeak = jumpDuration * 0.5;
-
+        let timeToFall = jumpDuration - timeToPeak;
         this.jumpGravity = (jumpHeight * 2) / sq(timeToPeak); // จากสูตรหาระยะทางเมื่อวัตถุเคลื่อนที่ด้วยความเร่งคงที่ เมื่อความเร็วที่จุดสูงสุดเป็น 0
-        this.jumpForce = this.jumpGravity * timeToPeak;
+        this.jumpForce = -this.jumpGravity * timeToPeak;
         this.jumpVelocity = 0;
+        this.jumpAirTime = 0;
+
+        this.timeToFrontFlip = timeToPeak * 0.125;
+        let frontFlipDuration = timeToPeak - this.timeToFrontFlip + (timeToFall * 0.5);
+        this.frontFlipVelocity = TWO_PI / frontFlipDuration;
 
         this.position.x = rubADubLibrary.level.centerBlockX + (RubADubDuck.START_BLOCK_OFFSET * rubADubLibrary.level.block.size.x);
         this.position.z = 0;
@@ -964,6 +980,23 @@ class RubADubDuck extends RubADubModel {
         this.setOnWater();
 
         this.soapBubble.clear();
+    }
+
+    startJumping(jumpForce) {
+        this.jumpVelocity = jumpForce;
+        this.jumpAirTime = 0;
+        this.angle.z = 0;
+        this.isJumping = true;
+        this.isFrontFlipping = false;
+        this.onBlock = null;
+    }
+
+    stopJumping(floor) {
+        this.position.y = floor;
+        this.jumpVelocity = 0;
+        this.jumpAirTime = 0;
+        this.angle.z = 0;
+        this.isJumping = false;
     }
 
     update() {
@@ -974,38 +1007,53 @@ class RubADubDuck extends RubADubModel {
 
             if (!this.isJumping) {
                 if (isJumpButtonPressed) {
-                    this.jumpVelocity = -this.jumpForce;
-                    this.isJumping = true;
-                    this.onBlock = null;
+                    this.startJumping(this.jumpForce);
                 } else if (this.onBlock == null) {
-                    this.jumpVelocity = 0;
-                    this.isJumping = true;
+                    this.startJumping(0);
                 }
             }
 
+            let dt = rubADubLibrary.getDeltaTime();
+
             if (this.isJumping) {
-                let dt = rubADubLibrary.getDeltaTime();
                 this.position.y += (this.jumpVelocity * dt) + (0.5 * this.jumpGravity * sq(dt)); // สูตรหาระยะทางเมื่อวัตถุเคลื่อนที่ด้วยความเร่งคงที่
                 this.jumpVelocity += this.jumpGravity * dt;
+                this.jumpAirTime += dt;
+
+                if (!this.isFrontFlipping && this.jumpAirTime >= this.timeToFrontFlip && this.jumpVelocity < 0) {
+                    this.isFrontFlipping = true;
+                    this.angle.z = this.frontFlipVelocity * dt;
+                }
 
                 if (this.jumpVelocity > 0) {
                     if (this.onBlock != null && this.position.y >= this.onBlockY) {
-                        this.position.y = this.onBlockY;
-                        this.jumpVelocity = 0;
-                        this.isJumping = false;
-                    } else {
-                        if (this.position.y >= this.onWaterY) {
-                            this.position.y = this.onWaterY;
-                            this.jumpVelocity = 0;
-                            this.isJumping = false;
-                            this.onBlock = null;
-                        }
+                        this.stopJumping(this.onBlockY);
+                    } else if (this.position.y >= this.onWaterY) {
+                        this.stopJumping(this.onWaterY);
+                        this.onBlock = null;
                     }
                 }
             }
 
-            level.duckYArray.unshift(this.position.y);
-            level.duckYArray.length = level.maxDuckYArrayLength;
+            if (this.isFrontFlipping && this.angle.z > 0) {
+                this.angle.z += this.frontFlipVelocity * dt;
+
+                if (this.angle.z >= TWO_PI) {
+                    this.angle.z = 0;
+                }
+            } else if (!this.isJumping) {
+                this.isFrontFlipping = false;
+
+                if (this.position.y == this.onWaterY) {
+                    this.offset.y = level.pool.water.bobbingMotion.offset;
+                    this.angle.z = level.pool.water.bobbingMotion.angle;
+                } else {
+                    this.offset.y = 0;
+                }
+            }
+
+            level.ducklingDataArray.unshift({y: this.position.y, offset: this.offset.y, angle: this.angle.z});
+            level.ducklingDataArray.length = level.maxDuckYArrayLength;
         }
     }
 
@@ -1013,10 +1061,10 @@ class RubADubDuck extends RubADubModel {
         let level = rubADubLibrary.level;
         super.render(this.position.x, this.position.y);
 
-        for (let i = level.ducklingMoveDelay; i < level.currentDuckYArraySize && level.duckYArray.length; i += level.ducklingMoveDelay) {
+        for (let i = level.ducklingMoveDelay; i < level.currentDuckYArraySize && level.ducklingDataArray.length; i += level.ducklingMoveDelay) {
             let ducklingIndex = i / level.ducklingMoveDelay;
             let x = this.position.x - ((this.halfSize.x + level.block.halfSize.x) * ducklingIndex);
-            let y = level.duckYArray[i] + this.halfSize.y - level.duckling.halfSize.y;
+            let y = level.ducklingDataArray[i].y + this.halfSize.y - level.duckling.halfSize.y;
             let useClearingBlocksFactor = false;
             let totalCollectedDucklings = (level.isLoadFirstLevel || !rubADubLibrary.isTryAgain) ? 0 : level.totalCollectedDucklings - level.collectedDucklingsArray[level.currentLevel];
 
@@ -1024,6 +1072,8 @@ class RubADubDuck extends RubADubModel {
                 useClearingBlocksFactor = true;
             }
 
+            level.duckling.offset.y = level.ducklingDataArray[i].offset;
+            level.duckling.angle.z = level.ducklingDataArray[i].angle;
             level.duckling.render(x, y, -1, -1, useClearingBlocksFactor);
         }
 
@@ -1041,6 +1091,8 @@ class RubADubDuckling extends RubADubModel {
 
     render(x, y, row = -1, column = -1, useClearingBlocksFactor = true) {
         super.render(x, y, useClearingBlocksFactor);
+        this.offset.y = 0;
+        this.angle.z = 0;
 
         if (row != -1 && column != -1) {
             let size = this.size.y * 1.25;
@@ -1185,7 +1237,7 @@ class RubADubLevel {
         this.currentDuckYArraySize = 0;
         this.totalCollectedDucklings = 0;
         this.visibledDucklingArray = [];
-        this.duckYArray = [];
+        this.ducklingDataArray = [];
         this.ducklingMoveDelay = 6;
         this.maxDucklings = 0;
 
@@ -1589,9 +1641,12 @@ class RubADubWater {
         this.frameInt = 0;
         this.uvOffset = 0;
         this.moveTime = 0;
+        this.bobbingMotion = new RubADubWaterBobbingMotion();
     }
 
     render() {
+        this.bobbingMotion.update();
+
         let dt = rubADubLibrary.getDeltaTime();
         this.moveTime = rubADubLibrary.isMotionFrozen() ? 0 : rubADubLibrary.level.blockSpeed * dt;
         this.uvOffset = ((this.uvOffset + (this.moveTime / this.totalLength)) % 1 + 1) % 1;
@@ -1618,6 +1673,54 @@ class RubADubWater {
         vertex(-this.halfLength, 0,  this.halfWidth, 0 + this.uvOffset, 1);
         endShape(CLOSE);
         pop();
+    }
+}
+
+////////////////////////////////////////////////////////////
+// water bobbing motion
+////////////////////////////////////////////////////////////
+class RubADubWaterBobbingMotion {
+    constructor(config = {}) {
+        this.wavePhase = random(TWO_PI);
+        this.speedNoisePos = random(256);
+        this.heightNoisePos = random(256);
+        this.tiltNoisePos = random(256);
+
+        this.speedNoiseRate = config.speedNoiseRate ?? 0.0008;
+        this.heightNoiseRate = config.heightNoiseRate ?? 0.0012;
+        this.tiltNoiseRate = config.tiltNoiseRate ?? 0.0010;
+
+        this.minWaveSpeed = config.minWaveSpeed ?? 0.005; // radians per milliseconds
+        this.maxWaveSpeed = config.maxWaveSpeed ?? 0.01; // radians per milliseconds
+
+        this.minWaveHeight = config.minWaveHeight ?? 0.0;
+        this.maxWaveHeight = config.maxWaveHeight ?? 2.0;
+
+        this.submergeRatio = config.submergeRatio ?? 1.0;
+
+        this.minTiltAngle = config.minTiltAngle ?? 0.05;
+        this.maxTiltAngle = config.maxTiltAngle ?? 0.15;
+
+        this.offset = 0;
+        this.angle = 0;
+    }
+
+    update() {
+        let dt = rubADubLibrary.getDeltaTime();
+
+        this.speedNoisePos = (this.speedNoisePos + dt * this.speedNoiseRate) % 256;
+        this.heightNoisePos = (this.heightNoisePos + dt * this.heightNoiseRate) % 256;
+        this.tiltNoisePos = (this.tiltNoisePos + dt * this.tiltNoiseRate) % 256;
+
+        let waveSpeed = map(noise(this.speedNoisePos), 0, 1, this.minWaveSpeed, this.maxWaveSpeed);
+        this.wavePhase = (this.wavePhase + waveSpeed * dt) % TWO_PI;
+
+        let waveHeight = map(noise(this.heightNoisePos), 0, 1, this.minWaveHeight, this.maxWaveHeight);
+        let upDownWave = sin(this.wavePhase);
+        this.offset = (upDownWave * waveHeight) + (abs(waveHeight) * this.submergeRatio);
+
+        let tiltAmp = map(noise(this.tiltNoisePos), 0, 1, this.minTiltAngle, this.maxTiltAngle);
+        this.angle = sin(this.wavePhase + 1) * tiltAmp;
     }
 }
 

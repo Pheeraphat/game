@@ -318,7 +318,7 @@ class RubADubLibrary {
     }
 
     render() {
-        this.deltaTime = min(deltaTime, 100);
+        this.deltaTime = min(deltaTime, 40);
         this.renderBackground();
 
         push();
@@ -707,8 +707,10 @@ class RubADubCamera {
     }
 
     reset() {
-        this.setDefaultState();
-        this.isResetting = true;
+        if (!this.isResetting) {
+            this.setDefaultState();
+            this.isResetting = true;
+        }
     }
 
     setDefaultState(duck = null) {
@@ -735,20 +737,17 @@ class RubADubCamera {
     }
 
     lerpAngle(current, target, amount) {
-        let diff = ((target - current + PI) % TWO_PI + TWO_PI) % TWO_PI - PI;
-        let result = current + diff * amount;
-        return ((result % TWO_PI) + TWO_PI) % TWO_PI;
+        let diff = gameLibrary.warpValue(target - current + PI, TWO_PI) - PI;
+        return gameLibrary.warpValue(current + diff * amount, TWO_PI);
     }
 
     applyCameraInput(deltaX, deltaY, scrollDelta, dt) {
         let speed = this.rotationSpeed * dt * ((gameLibrary.targetFrameRate > 0) ? (gameLibrary.targetFrameRate / gameLibrary.defaultFrameRate) : 1);
-
-        this.angle.y += deltaX * speed;
-        this.angle.y = ((this.angle.y % TWO_PI) + TWO_PI) % TWO_PI;
+        this.angle.y = gameLibrary.warpValue(this.angle.y + (deltaX * speed), TWO_PI);
 
         let signedAngleX = (this.angle.x > PI) ? this.angle.x - TWO_PI : this.angle.x;
         signedAngleX = constrain(signedAngleX - deltaY * speed, -this.autoDriftConfig.maxUpAngle, this.autoDriftConfig.maxDownAngle);
-        this.angle.x = ((signedAngleX % TWO_PI) + TWO_PI) % TWO_PI;
+        this.angle.x = gameLibrary.warpValue(signedAngleX, TWO_PI);
 
         this.targetZoom = constrain(this.targetZoom + scrollDelta, this.autoDriftConfig.minZoom, this.autoDriftConfig.maxZoom);
     }
@@ -800,27 +799,24 @@ class RubADubCamera {
 
         if (this.isResetting || (this.isAutoDrifting && !this.isDragging)) {
             if (this.isResetting) {
-//                if (this.targetZoom != this.defaultState.zoom) {
-//                    this.targetZoom = lerp(this.targetZoom, this.defaultState.zoom, smoothFactor);
-//
-//                    if (abs(this.targetZoom - this.defaultState.zoom) < 0.1) {
-//                        this.targetZoom = this.defaultState.zoom;
-//                    }
-//                }
-//
-//                this.angle.x = this.lerpAngle(this.angle.x, this.defaultState.angle.x, smoothFactor);
-//                this.angle.y = this.lerpAngle(this.angle.y, this.defaultState.angle.y, smoothFactor);
-//
-//                let diffX = abs(((this.defaultState.angle.x - this.angle.x + PI) % TWO_PI + TWO_PI) % TWO_PI - PI);
-//                let diffY = abs(((this.defaultState.angle.y - this.angle.y + PI) % TWO_PI + TWO_PI) % TWO_PI - PI);
-//
-//                if (distLookAt == 0 && abs(this.zoom - this.defaultState.zoom) < 0.1 && diffX < 0.005 && diffY < 0.005) {
+                if (this.targetZoom != this.defaultState.zoom) {
+                    this.targetZoom = lerp(this.targetZoom, this.defaultState.zoom, smoothFactor);
+                }
+
+                let diffZoom = abs(this.zoom - this.defaultState.zoom);
+                this.angle.x = this.lerpAngle(this.angle.x, this.defaultState.angle.x, smoothFactor);
+                this.angle.y = this.lerpAngle(this.angle.y, this.defaultState.angle.y, smoothFactor);
+
+                let diffAngleX = abs(this.angle.x - this.defaultState.angle.x);
+                let diffAngleY = abs(this.angle.x - this.defaultState.angle.x);
+
+                if (distLookAt == 0 && diffZoom < 0.1 && diffAngleX < 0.005 && diffAngleY < 0.005) {
                     this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
                     this.targetZoom = this.defaultState.zoom;
                     this.zoom = this.targetZoom;
                     this.angle.set(this.defaultState.angle.x, this.defaultState.angle.y, this.defaultState.angle.z);
                     this.isResetting = false;
-//                }
+                }
             } else {
                 this.autoDriftConfig.driftBlend = min(this.autoDriftConfig.driftBlend + (0.0007 * dt), 1.0);
 
@@ -1205,7 +1201,7 @@ class RubADubLevel {
             }
         }
 
-        this.maxDuckYArrayLength = ((this.maxDucklings + 1) * this.ducklingMoveDelay) - 1;
+        this.maxDuckYArrayLength = (this.maxDucklings + 1) * this.ducklingMoveDelay;
         this.clearBlocks(false);
     }
 
@@ -1318,28 +1314,33 @@ class RubADubLevel {
 
         for (let row = 0; row < this.dataArray[this.currentLevel].length; row++) {
             let dataString = this.getDataString(this.currentLevel, row);
-            let last = dataString.length - 1;
-            let current = min(ceil(this.blockMoveLength / this.block.size.x), last);
-            let first = min(current - RubADubPool.BLOCKS_ALONG_LENGTH + 1, 0);
+            let current = min(ceil(this.blockMoveLength / this.block.size.x), dataString.length - 1);
+            let first = max(current - RubADubPool.BLOCKS_ALONG_LENGTH + 1, 0);
+            let hasCharXAO = /[XAO]/.test(dataString);
 
-            for (let column = first; column <= current; column++) {
-                let x = this.pool.nearRightBlockPosition.x + (this.block.size.x * column) - this.blockMoveLength;
-                let y = this.pool.water.position.y - (this.block.size.y * row);
+            if (hasCharXAO) {
+                for (let column = first; column <= current; column++) {
+                    let x = this.pool.nearRightBlockPosition.x + (this.block.size.x * column) - this.blockMoveLength;
 
-                switch (dataString[column]) {
-                    case "X":
-                        this.block.render(x, y - this.block.halfSize.y);
-                        break;
+                    if (x >= this.pool.farLeftBlockPosition.x && x <= this.pool.nearRightBlockPosition.x) {
+                        let y = this.pool.water.position.y - (this.block.size.y * row);
 
-                    case "A":
-                        this.spike.render(x, y - this.spike.halfSize.y );
-                        break;
+                        switch (dataString[column]) {
+                            case "X":
+                                this.block.render(x, y - this.block.halfSize.y);
+                                break;
 
-                    case "O":
-                        if (this.visibledDucklingArray.indexOf(this.getRowColumnString(row, column)) != -1) {
-                            this.duckling.render(x, y - this.block.halfSize.y, row, column);
+                            case "A":
+                                this.spike.render(x, y - this.spike.halfSize.y );
+                                break;
+
+                            case "O":
+                                if (this.visibledDucklingArray.indexOf(this.getRowColumnString(row, column)) != -1) {
+                                    this.duckling.render(x, y - this.block.halfSize.y, row, column);
+                                }
+                                break;
                         }
-                        break;
+                    }
                 }
             }
         }

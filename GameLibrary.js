@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////
-// Game Library Version 2.1.20261117
+// Game Library Version 2.1.20261123
 // by Pheeraphat Sawangphian
 ////////////////////////////////////////////////////////////
 
@@ -455,6 +455,18 @@ class GameLibrary {
     }
 
     // utilities
+    warpValue(value, maxValue, minValue = 0) {
+        let range = maxValue - minValue;
+
+        value = (value - minValue) % range;
+
+        if (value < 0) {
+            value += range;
+        }
+
+        return value + minValue;
+    }
+
     clamp(value, minValue, maxValue) {
         return (value < minValue) ? minValue : (value > maxValue) ? maxValue : value;
     }
@@ -4293,7 +4305,7 @@ class GameParticle {
         this.elementArray[i].topLeftPoint.x = this.elementArray[i].centerVector.x - halfSize;
         this.elementArray[i].topLeftPoint.y = this.elementArray[i].centerVector.y - halfSize;
 
-        if (halfSize <= 0.0 || (!this.parent.isWebGLEnabled && (this.elementArray[i].centerVector.x < -halfSize || this.elementArray[i].centerVector.x > this.parent.offscreen.displayWidth + halfSize || this.elementArray[i].centerVector.y < -halfSize || this.elementArray[i].centerVector.y > this.parent.offscreen.displayHeight + halfSize))) {
+        if (halfSize <= 0.0 || this.elementArray[i].lifespan == 0.0 || (!this.parent.isWebGLEnabled && (this.elementArray[i].centerVector.x < -halfSize || this.elementArray[i].centerVector.x > this.parent.offscreen.displayWidth + halfSize || this.elementArray[i].centerVector.y < -halfSize || this.elementArray[i].centerVector.y > this.parent.offscreen.displayHeight + halfSize))) {
             this.elementArray[i].lifespan = 0.0;
             this.elementArray.splice(i, 1);
             isDead = true;

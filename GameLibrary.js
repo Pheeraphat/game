@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////
-// Game Library Version 2.1.20261123
+// Game Library Version 2.1.20261125
 // by Pheeraphat Sawangphian
 ////////////////////////////////////////////////////////////
 
@@ -455,6 +455,11 @@ class GameLibrary {
     }
 
     // utilities
+    lerpAngle(current, target, amount) {
+        let diff = gameLibrary.warpValue(target - current + PI, 0, TWO_PI) - PI;
+        return this.warpValue(current + diff * amount, 0, TWO_PI);
+    }
+
     warpValue(value, minValue, maxValue) {
         let range = maxValue - minValue;
 
@@ -482,12 +487,20 @@ class GameLibrary {
         return degrees(angleInRadians);
     }
 
-    distance(x1, y1, x2, y2) {
-        return dist(x1, y1, x2, y2);
+    distance(...args) {
+        if (args.length == 4) {
+            const [x1, y1, x2, y2] = args;
+            return dist(x1, y1, x2, y2);
+        } else if (args.length == 6) {
+            const [x1, y1, z1, x2, y2, z2] = args;
+            return dist(x1, y1, z1, x2, y2, z2);
+        }
+
+        return 0;
     }
 
     distancePoint(p1, p2) {
-        return dist(p1.x, p1.y, p2.x, p2.y);
+        return dist(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
     }
 
     ease(start, duration, maxScale = 1.0, pointerToFloatScale = null) {
@@ -3628,6 +3641,13 @@ class GameVector {
 
     lerp(v0, v1, amount) {
         return p5.Vector.lerp(v0, v1, amount);
+    }
+
+    lerpAngle(v0, v1, amount) {
+        let x = gameLibrary.lerpAngle(v0.x, v1.x, amount);
+        let y = gameLibrary.lerpAngle(v0.y, v1.y, amount);
+        let z = gameLibrary.lerpAngle(v0.z, v1.z, amount);
+        return createVector(x, y, z);
     }
 
     mult(v0, v1) {

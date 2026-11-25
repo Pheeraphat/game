@@ -215,6 +215,7 @@ class RubADubLibrary {
         // object
         this.camera = new RubADubCamera();
         this.level = new RubADubLevel();
+        this.background = new RubADubParallaxBackground();
     }
 
     canCheckCollision() {
@@ -249,6 +250,10 @@ class RubADubLibrary {
         ambientLight(255);
         textureMode(NORMAL);
         textureWrap(REPEAT);
+
+        this.background.add(RubADubLibrary.IMAGE_BACKGROUND_LAYER_0, 0.0);
+        this.background.add(RubADubLibrary.IMAGE_BACKGROUND_LAYER_1, 0.125);
+        this.background.add(RubADubLibrary.IMAGE_BACKGROUND_LAYER_2, 0.5);
 
         this.level.init();
         this.camera.init();
@@ -287,13 +292,7 @@ class RubADubLibrary {
                 }
             }
 
-            if (this.level.blockMoveLength > 0) {
-                this.level.clearBlocks(true);
-            } else if (this.level.isLoadFirstLevel) {
-                this.level.clearBlocks(false);
-                this.level.load(0);
-            }
-
+            this.level.clearBlocks(true);
             this.isGameOver = false;
             this.isGameFinished = false;
 
@@ -318,7 +317,8 @@ class RubADubLibrary {
     }
 
     render() {
-        this.deltaTime = min(deltaTime, 40);
+        this.deltaTime = min(deltaTime, 40); // 40 = 1000 / 25 frames per second
+        this.renderBackground();
         this.renderBackground();
 
         push();
@@ -331,16 +331,19 @@ class RubADubLibrary {
 
     renderBackground() {
         gameLibrary.beginWebGLHUD();
-        push();
 
         if (gameLibrary.camera.isEnabled) {
+            push();
             gameLibrary.camera.render();
+            pop();
         } else {
-            imageMode(CENTER);
-            image(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_BACKGROUND_LAYER_0].image, gameLibrary.displayCenterPoint.x, gameLibrary.displayCenterPoint.y, gameLibrary.displayWidth, gameLibrary.displayHeight, 0, 0, gameLibrary.gameImageArray[RubADubLibrary.IMAGE_BACKGROUND_LAYER_0].width, gameLibrary.gameImageArray[RubADubLibrary.IMAGE_BACKGROUND_LAYER_0].height, COVER);
+            if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU) {
+                this.background.moveBy(-this.level.pool.water.moveStep, 0);
+            }
+
+            this.background.render();
         }
 
-        pop();
         gameLibrary.endWebGLHUD();
     }
 
@@ -441,6 +444,8 @@ class RubADubLibrary {
             this.infoScaledRectArray[i].x = (gameLibrary.displayWidth - this.infoScaledRectArray[i].width) * 0.5;
             this.infoScaledRectArray[i].y = 0;
         }
+
+        this.background.resize();
     }
 }
 
@@ -741,20 +746,16 @@ class RubADubCamera {
         this.previousMouse.set(-1, -1);
     }
 
-    lerpAngle(current, target, amount) {
-        let diff = gameLibrary.warpValue(target - current + PI, 0, TWO_PI) - PI;
-        return gameLibrary.warpValue(current + diff * amount, 0, TWO_PI);
-    }
-
     applyCameraInput(deltaX, deltaY, scrollDelta, dt) {
         let speed = this.rotationSpeed * dt * ((gameLibrary.targetFrameRate > 0) ? (gameLibrary.targetFrameRate / gameLibrary.defaultFrameRate) : 1);
         this.angle.y = gameLibrary.warpValue(this.angle.y + (deltaX * speed), 0, TWO_PI);
 
         let signedAngleX = (this.angle.x > PI) ? this.angle.x - TWO_PI : this.angle.x;
-        signedAngleX = constrain(signedAngleX - deltaY * speed, -this.autoDriftConfig.maxUpAngle, this.autoDriftConfig.maxDownAngle);
+        signedAngleX = constrain(signedAngleX - (deltaY * speed), -this.autoDriftConfig.maxUpAngle, this.autoDriftConfig.maxDownAngle);
         this.angle.x = gameLibrary.warpValue(signedAngleX, 0, TWO_PI);
 
         this.targetZoom = constrain(this.targetZoom + scrollDelta, this.autoDriftConfig.minZoom, this.autoDriftConfig.maxZoom);
+        rubADubLibrary.background.moveBy(-deltaX, 0);
     }
 
     update() {
@@ -786,19 +787,15 @@ class RubADubCamera {
             }
         }
 
-        let distLookAt = 0;
-        let isReset = false;
+        let diffLookAt = 0;
 
-        if (this.lookAt.x != this.autoDriftConfig.lookAt.x && this.lookAt.y != this.autoDriftConfig.lookAt.y && this.lookAt.z != this.autoDriftConfig.lookAt.z) {
-            this.lookAt.x = lerp(this.lookAt.x, this.autoDriftConfig.lookAt.x, lookAtSmoothFactor);
-            this.lookAt.y = lerp(this.lookAt.y, this.autoDriftConfig.lookAt.y, lookAtSmoothFactor);
-            this.lookAt.z = lerp(this.lookAt.z, this.autoDriftConfig.lookAt.z, lookAtSmoothFactor);
+        if (this.lookAt != this.autoDriftConfig.lookAt) {
+            this.lookAt = gameLibrary.vector.lerp(this.lookAt, this.autoDriftConfig.lookAt, lookAtSmoothFactor);
+            diffLookAt = gameLibrary.vector.dist(this.lookAt, this.autoDriftConfig.lookAt);
 
-            distLookAt = dist(this.lookAt.x, this.lookAt.y, this.lookAt.z, this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
-
-            if (distLookAt < 0.1) {
+            if (diffLookAt < 0.1) {
                 this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
-                distLookAt = 0;
+                diffLookAt = 0;
             }
         }
 
@@ -809,13 +806,10 @@ class RubADubCamera {
                 }
 
                 let diffZoom = abs(this.zoom - this.defaultState.zoom);
-                this.angle.x = this.lerpAngle(this.angle.x, this.defaultState.angle.x, smoothFactor);
-                this.angle.y = this.lerpAngle(this.angle.y, this.defaultState.angle.y, smoothFactor);
+                this.angle = gameLibrary.vector.lerpAngle(this.angle, this.defaultState.angle, smoothFactor);
+                let diffAngle = gameLibrary.vector.dist(this.angle, this.defaultState.angle);
 
-                let diffAngleX = abs(this.angle.x - this.defaultState.angle.x);
-                let diffAngleY = abs(this.angle.x - this.defaultState.angle.x);
-
-                if (distLookAt == 0 && diffZoom < 0.1 && diffAngleX < 0.005 && diffAngleY < 0.005) {
+                if (diffLookAt == 0 && diffZoom < 0.1 && diffAngle < 0.005) {
                     this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
                     this.targetZoom = this.defaultState.zoom;
                     this.zoom = this.targetZoom;
@@ -857,17 +851,15 @@ class RubADubCamera {
     }
 
     onMouseButtonDown() {
-        if (gameLibrary.gameMode == RubADubLibrary.GAME_MODE_MENU) {
-            this.isDragging = true;
-            this.isAutoDrifting = false;
-            this.isResetting = false;
-            this.autoDriftConfig.driftBlend = 0;
-            this.previousMouse.set(mouseX, mouseY);
-        }
+        this.isDragging = true;
+        this.isAutoDrifting = false;
+        this.isResetting = false;
+        this.autoDriftConfig.driftBlend = 0;
+        this.previousMouse.set(mouseX, mouseY);
     }
 
     onMouseDrag() {
-        if (gameLibrary.gameMode == RubADubLibrary.GAME_MODE_MENU && this.isDragging) {
+        if (this.isDragging) {
             let delta = new GamePoint(mouseX - this.previousMouse.x, mouseY - this.previousMouse.y);
             this.applyCameraInput(delta.x, delta.y, 0, rubADubLibrary.getDeltaTime());
             this.previousMouse.set(mouseX, mouseY);
@@ -875,17 +867,15 @@ class RubADubCamera {
     }
 
     onMouseButtonUp() {
-        if (gameLibrary.gameMode == RubADubLibrary.GAME_MODE_MENU && this.isDragging) {
+        if (this.isDragging) {
             this.isDragging = false;
             this.autoDrift(true);
         }
     }
 
     onMouseWheel(delta) {
-        if (gameLibrary.gameMode == RubADubLibrary.GAME_MODE_MENU) {
-            this.applyCameraInput(0, 0, delta * 0.25, 0);
-            this.autoDrift(true);
-        }
+        this.applyCameraInput(0, 0, delta * 0.25, 0);
+        this.autoDrift(true);
     }
 }
 
@@ -962,7 +952,7 @@ class RubADubDuck extends RubADubModel {
 
     init() {
         let jumpHeight = RubADubDuck.JUMP_HEIGHT_BLOCKS * rubADubLibrary.level.block.size.y;
-        let jumpDuration = (RubADubDuck.JUMP_SPAN_BLOCKS / RubADubLevel.BOXES_MOVE_PER_SEC) * 1000;
+        let jumpDuration = (RubADubDuck.JUMP_SPAN_BLOCKS / RubADubLevel.BLOCKS_MOVE_PER_SEC) * 1000;
         let timeToPeak = jumpDuration * 0.5;
         let timeToFall = jumpDuration - timeToPeak;
         this.jumpGravity = (jumpHeight * 2) / sq(timeToPeak); // จากสูตรหาระยะทางเมื่อวัตถุเคลื่อนที่ด้วยความเร่งคงที่ เมื่อความเร็วที่จุดสูงสุดเป็น 0
@@ -1052,31 +1042,15 @@ class RubADubDuck extends RubADubModel {
                 }
             }
 
-            level.ducklingDataArray.unshift({y: this.position.y, offset: this.offset.y, angle: this.angle.z});
-            level.ducklingDataArray.length = level.maxDuckYArrayLength;
+            level.followingDuckling.addMomAction(this.position.y, this.offset.y, this.angle.z);
         }
     }
 
     render() {
+        this.update();
         let level = rubADubLibrary.level;
         super.render(this.position.x, this.position.y);
-
-        for (let i = level.ducklingMoveDelay; i < level.currentDuckYArraySize && level.ducklingDataArray.length; i += level.ducklingMoveDelay) {
-            let ducklingIndex = i / level.ducklingMoveDelay;
-            let x = this.position.x - ((this.halfSize.x + level.block.halfSize.x) * ducklingIndex);
-            let y = level.ducklingDataArray[i].y + this.halfSize.y - level.duckling.halfSize.y;
-            let useClearingBlocksFactor = false;
-            let totalCollectedDucklings = (level.isLoadFirstLevel || !rubADubLibrary.isTryAgain) ? 0 : level.totalCollectedDucklings - level.collectedDucklingsArray[level.currentLevel];
-
-            if (ducklingIndex > totalCollectedDucklings) {
-                useClearingBlocksFactor = true;
-            }
-
-            level.duckling.offset.y = level.ducklingDataArray[i].offset;
-            level.duckling.angle.z = level.ducklingDataArray[i].angle;
-            level.duckling.render(x, y, -1, -1, useClearingBlocksFactor);
-        }
-
+        level.followingDuckling.render();
         this.soapBubble.render();
     }
 }
@@ -1099,7 +1073,89 @@ class RubADubDuckling extends RubADubModel {
             rubADubLibrary.renderBillboard(this.position, size, size, RubADubLibrary.TEXTURE_SOAP_BUBBLE, this.alpha);
 
             if (this.isHittingDuck()) {
-                rubADubLibrary.level.collectDuckling(row, column);
+                rubADubLibrary.level.followingDuckling.add(row, column);
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////
+// following duckling
+////////////////////////////////////////////////////////////
+class RubADubFollowingDuckling {
+    constructor() {
+        let maxDuckling = 0;
+
+        for (let level = 0; level < rubADubLibrary.level.numberOfLevels; level++) {
+            for (let row = 0; row < rubADubLibrary.level.dataArray[level].length; row++) {
+                let dataString = rubADubLibrary.level.getDataString(level, row);
+
+                for (let column = 0; column < dataString.length; column++) {
+                    if (dataString[column] == "O") {
+                        maxDuckling++;
+                    }
+                }
+            }
+        }
+
+        this.distanceFromMom = int(rubADubLibrary.level.duck.size.x * 1.5);
+        this.actionDelay = int(this.distanceFromMom / rubADubLibrary.level.blockSpeed);
+        this.momActionArrayStep = int(this.actionDelay * gameLibrary.targetFrameRate / 1000);
+        this.maxMomActionArrayLength = (this.momActionArrayStep + 1) * maxDuckling;
+        this.counter = new Array(rubADubLibrary.level.numberOfLevels).fill(0);
+        this.total = 0;
+        this.isVisibledArray = [];
+        this.momActionArray = [];
+    }
+
+    add(row, column) {
+        let level = rubADubLibrary.level;
+        gameLibrary.sound.play(RubADubLibrary.SOUND_POP);
+        this.counter[level.currentLevel]++;
+        let found = this.isVisibledArray.indexOf(level.getRowColumnString(row, column));
+
+        if (found != -1) {
+            this.isVisibledArray.splice(found, 1);
+        }
+
+        this.total = this.counter.slice(0, level.currentLevel + 1).reduce((total, num) => total + num, 0);
+    }
+
+    addMomAction(momPositionY, momOffsetY, momAngleZ) {
+        this.momActionArray.unshift({y: momPositionY, offset: momOffsetY, angle: momAngleZ});
+        this.momActionArray.length = this.maxMomActionArrayLength;
+    }
+
+    reset() {
+        let level = rubADubLibrary.level;
+        this.counter[level.currentLevel] = 0;
+        this.total = this.counter.slice(0, level.currentLevel + 1).reduce((total, num) => total + num, 0);
+        this.isVisibledArray = [];
+
+        for (let row = 0; row < level.dataArray[level.currentLevel].length; row++) {
+            let dataString = level.getDataString(level.currentLevel, row);
+
+            for (let column = 0; column < dataString.length; column++) {
+                if (dataString[column] == "O") {
+                    this.isVisibledArray.push(level.getRowColumnString(row, column));
+                }
+            }
+        }
+    }
+
+    render() {
+        let level = rubADubLibrary.level;
+        let y = level.duck.halfSize.y - level.duckling.halfSize.y;
+        let num = (level.isLoadFirstLevel || !rubADubLibrary.isTryAgain) ? 0 : this.total - this.counter[level.currentLevel];
+
+        for (let ducklingIndex = 0; ducklingIndex < this.total; ducklingIndex++) {
+            let i = this.momActionArrayStep * (ducklingIndex + 1);
+
+            if (i < this.momActionArray.length) {
+                let x = level.duck.position.x - (this.distanceFromMom * (ducklingIndex + 1));
+                level.duckling.offset.y = this.momActionArray[i].offset;
+                level.duckling.angle.z = this.momActionArray[i].angle;
+                level.duckling.render(x, y + this.momActionArray[i].y, -1, -1, ducklingIndex >= num);
             }
         }
     }
@@ -1109,7 +1165,7 @@ class RubADubDuckling extends RubADubModel {
 // level
 ////////////////////////////////////////////////////////////
 class RubADubLevel {
-    static get BOXES_MOVE_PER_SEC()      {return   6;}
+    static get BLOCKS_MOVE_PER_SEC()      {return   6;}
     static get FADING_BLOCKS()           {return   3;}
     static get CLEARING_BLOCK_DURATION() {return 500;}
 
@@ -1217,6 +1273,7 @@ class RubADubLevel {
         this.duckType = 0;
         this.duck = null;
         this.duckling = null;
+        this.followingDuckling = null;
         this.block = null;
         this.spike = null;
         this.pool = null;
@@ -1231,29 +1288,6 @@ class RubADubLevel {
         this.numberOfLevels = this.dataArray.length;
         this.lastLevel = this.numberOfLevels - 1;
         this.isLoadFirstLevel = false;
-
-        // collected duckling
-        this.collectedDucklingsArray = new Array(this.numberOfLevels).fill(0);
-        this.currentDuckYArraySize = 0;
-        this.totalCollectedDucklings = 0;
-        this.visibledDucklingArray = [];
-        this.ducklingDataArray = [];
-        this.ducklingMoveDelay = 6;
-        this.maxDucklings = 0;
-
-        for (let level = 0; level < this.numberOfLevels; level++) {
-            for (let row = 0; row < this.dataArray[level].length; row++) {
-                let dataString = this.getDataString(level, row);
-
-                for (let column = 0; column < dataString.length; column++) {
-                    if (dataString[column] == "O") {
-                        this.maxDucklings++;
-                    }
-                }
-            }
-        }
-
-        this.maxDuckYArrayLength = (this.maxDucklings + 1) * this.ducklingMoveDelay;
         this.clearBlocks(false);
     }
 
@@ -1264,19 +1298,6 @@ class RubADubLevel {
         if (!this.isClearingBlocks) {
             this.blockMoveLength = 0;
         }
-    }
-
-    collectDuckling(row, column) {
-        gameLibrary.sound.play(RubADubLibrary.SOUND_POP);
-        this.collectedDucklingsArray[this.currentLevel]++;
-        let found = this.visibledDucklingArray.indexOf(this.getRowColumnString(row, column));
-
-        if (found != -1) {
-            this.visibledDucklingArray.splice(found, 1);
-        }
-
-        this.totalCollectedDucklings = this.collectedDucklingsArray.slice(0, this.currentLevel + 1).reduce((total, num) => total + num, 0);
-        this.currentDuckYArraySize = (this.totalCollectedDucklings + 1) * this.ducklingMoveDelay;
     }
 
     getDataString(level, row) {
@@ -1292,7 +1313,7 @@ class RubADubLevel {
         if (this.pool == null) {
             // block
             this.block = new RubADubBlock();
-            this.blockSpeed = (RubADubLevel.BOXES_MOVE_PER_SEC * this.block.size.x) / 1000;
+            this.blockSpeed = (RubADubLevel.BLOCKS_MOVE_PER_SEC * this.block.size.x) / 1000;
 
             // pool
             this.pool = new RubADubPool(0, 0, 0);
@@ -1308,6 +1329,8 @@ class RubADubLevel {
             this.duckling = new RubADubDuckling();
             this.spike = new RubADubSpike();
 
+            this.followingDuckling = new RubADubFollowingDuckling();
+
             this.load(0);
             this.duck.init();
         }
@@ -1320,7 +1343,7 @@ class RubADubLevel {
         this.blockMoveLength = 0;
         this.isLoadFirstLevel = false;
         rubADubLibrary.isTryAgain = false;
-        this.resetData();
+        this.followingDuckling.reset();
     }
 
     next() {
@@ -1344,9 +1367,7 @@ class RubADubLevel {
         noStroke();
 
         this.pool.render();
-
-        // duck
-        this.duck.update();
+        this.duck.render();
 
         // clearing blocks
         if (this.isClearingBlocks && this.clearingBlocksFactor > 0) {
@@ -1361,7 +1382,7 @@ class RubADubLevel {
         this.isBlockCollisionChecked = false;
 
         if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU && !rubADubLibrary.levelBlink.isBlinking) {
-            this.blockMoveLength += this.pool.water.moveTime;
+            this.blockMoveLength += this.pool.water.moveStep;
         }
 
         for (let row = 0; row < this.dataArray[this.currentLevel].length; row++) {
@@ -1387,7 +1408,7 @@ class RubADubLevel {
                                 break;
 
                             case "O":
-                                if (this.visibledDucklingArray.indexOf(this.getRowColumnString(row, column)) != -1) {
+                                if (this.followingDuckling.isVisibledArray.indexOf(this.getRowColumnString(row, column)) != -1) {
                                     this.duckling.render(x, y - this.block.halfSize.y, row, column);
                                 }
                                 break;
@@ -1403,13 +1424,11 @@ class RubADubLevel {
             }
         }
 
-        this.duck.render();
-
         if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU) {
             if (this.blockMoveLength >= this.maxBlockMoveLength || (this.isClearingBlocks && this.clearingBlocksFactor == 0)) {
                 if (this.isClearingBlocks) {
                     this.clearBlocks(false);
-                    this.resetData();
+                    this.followingDuckling.reset();
                 } else if (!this.isLoadFirstLevel) {
                     this.next();
                 }
@@ -1421,22 +1440,152 @@ class RubADubLevel {
         }
         pop();
     }
+}
 
-    resetData() {
-        this.collectedDucklingsArray[this.currentLevel] = 0;
-        this.totalCollectedDucklings = this.collectedDucklingsArray.slice(0, this.currentLevel + 1).reduce((total, num) => total + num, 0);
-        this.currentDuckYArraySize = (this.totalCollectedDucklings + 1) * this.ducklingMoveDelay;
-        this.visibledDucklingArray = [];
+////////////////////////////////////////////////////////////
+// parallax background
+////////////////////////////////////////////////////////////
+class RubADubParallaxBackground {
+    constructor(maxZoom = 1.3, smoothness = 10 / 1000) {
+        this.layers = [];
+        this.maxZoom = maxZoom;
+        this.smoothness = smoothness;
 
-        for (let row = 0; row < this.dataArray[this.currentLevel].length; row++) {
-            let dataString = this.getDataString(this.currentLevel, row);
+        this.currentX = 0;
+        this.currentY = 0;
+        this.targetX = 0;
+        this.targetY = 0;
 
-            for (let column = 0; column < dataString.length; column++) {
-                if (dataString[column] == "O") {
-                    this.visibledDucklingArray.push(this.getRowColumnString(row, column));
-                }
+        this.isDragging = false;
+        this.startMouseX = 0;
+        this.startMouseY = 0;
+        this.savedOffsetX = 0;
+        this.savedOffsetY = 0;
+    }
+
+    add(imageIndex, speed) {
+        this.layers.push({img: gameLibrary.gameImageArray[imageIndex].image, speed: speed, zoom: 0});
+        let maxSpeed = max(this.layers.map(c => c.speed ?? 0));
+
+        for (let layer of this.layers) {
+            let speedRatio = (maxSpeed > 0) ? layer.speed / maxSpeed : 0;
+            layer.zoom = 1 + (this.maxZoom - 1) * speedRatio;
+        }
+    }
+
+    getAspectCoverSize(img, targetW, targetH, minZoom) {
+        let scaleRatio = max((targetW * minZoom) / img.width, (targetH * minZoom) / img.height);
+        return {w: img.width * scaleRatio, h: img.height * scaleRatio};
+    }
+
+    getMaxPanY() {
+        let maxPanY = 0;
+
+        if (this.layers.length > 0) {
+            let primaryLayer = this.layers.reduce((prev, curr) => curr.speed > prev.speed ? curr : prev);
+
+            if (primaryLayer.speed > 0) {
+                let size = this.getAspectCoverSize(primaryLayer.img, gameLibrary.displayWidth, gameLibrary.displayHeight, primaryLayer.zoom);
+                maxPanY = abs((gameLibrary.displayHeight - size.h) * 0.5) / primaryLayer.speed;
             }
         }
+
+        return maxPanY;
+    }
+
+    render() {
+        if (this.layers.length > 0) {
+            let dt = rubADubLibrary.getDeltaTime();
+            let smoothFactor = 1 - exp(-this.smoothness * dt);
+            this.currentX = lerp(this.currentX, this.targetX, smoothFactor);
+            this.currentY = lerp(this.currentY, this.targetY, smoothFactor);
+
+            push();
+            for (let layer of this.layers) {
+                let size = this.getAspectCoverSize(layer.img, gameLibrary.displayWidth, gameLibrary.displayHeight, layer.zoom);
+                let centerX = (gameLibrary.displayWidth - size.w) / 2;
+                let centerY = (gameLibrary.displayHeight - size.h) / 2;
+
+                if (layer.speed === 0) {
+                    image(layer.img, centerX, centerY, size.w, size.h);
+                } else {
+                    let y = constrain(centerY + this.currentY * layer.speed, gameLibrary.displayHeight - size.h, 0);
+                    let rawX = centerX + this.currentX * layer.speed;
+                    let wrappedX = ((rawX % size.w) - size.w) % size.w;
+
+                    for (let drawX = wrappedX; drawX < gameLibrary.displayWidth; drawX += size.w) {
+                        image(layer.img, drawX, y, size.w, size.h);
+                    }
+                }
+            }
+            pop();
+        }
+    }
+
+    moveBy(dx = 0, dy = 0) {
+        if (this.layers.length > 0) {
+            let maxY = this.getMaxPanY();
+            this.targetX += dx;
+            this.targetY = constrain(this.targetY + dy, -maxY, maxY);
+            this.savedOffsetX = this.targetX;
+            this.savedOffsetY = this.targetY;
+        }
+    }
+
+    moveTo(x = 0, y = 0) {
+        if (this.layers.length > 0) {
+            let maxY = this.getMaxPanY();
+            this.targetX = x;
+            this.targetY = constrain(y, -maxY, maxY);
+
+            this.savedOffsetX = this.targetX;
+            this.savedOffsetY = this.targetY;
+        }
+    }
+
+    onMouseButtonDown() {
+        this.isDragging = true;
+    }
+
+    onMouseDrag() {
+        if (this.isDragging) {
+            let maxY = this.getMaxPanY();
+            let rawX = this.savedOffsetX - (mouseX - gameLibrary.touchBeganPoint.x);
+            let rawY = this.savedOffsetY + (mouseY - gameLibrary.touchBeganPoint.y);
+
+            this.targetX = rawX;
+            this.targetY = constrain(rawY, -maxY, maxY);
+        }
+    }
+
+    onMouseButtonUp() {
+        if (this.isDragging) {
+            this.isDragging = false;
+            this.savedOffsetX = this.targetX;
+            this.savedOffsetY = this.targetY;
+        }
+    }
+
+    reset() {
+        let movingLayers = this.layers.filter(l => l.speed > 0);
+
+        if (movingLayers.length > 0) {
+            let slowestLayer = movingLayers.reduce((prev, curr) => curr.speed < prev.speed ? curr : prev);
+            let size = this.getAspectCoverSize(slowestLayer.img, gameLibrary.displayWidth, gameLibrary.displayHeight, slowestLayer.zoom);
+            let cycleW = size.w / slowestLayer.speed;
+            this.currentX = this.currentX % cycleW;
+        }
+
+        this.targetX = 0;
+        this.targetY = 0;
+        this.savedOffsetX = 0;
+        this.savedOffsetY = 0;
+    }
+
+    resize() {
+        let maxY = this.getMaxPanY();
+        this.targetY = constrain(this.targetY, -maxY, maxY);
+        this.savedOffsetY = this.targetY;
     }
 }
 
@@ -1586,7 +1735,7 @@ class RubADubSoapBubble {
                 let isDead = false;
 
                 if (!rubADubLibrary.isMotionFrozen() && this.updateTime == 0) {
-                    element.velocityVector.x = -level.pool.water.moveTime * random(0.5, 1.5);
+                    element.velocityVector.x = -level.pool.water.moveStep * random(0.5, 1.5);
                     isDead = gameLibrary.particle.updateElement(i);
                 }
 
@@ -1640,7 +1789,7 @@ class RubADubWater {
         this.frame = 0.0;
         this.frameInt = 0;
         this.uvOffset = 0;
-        this.moveTime = 0;
+        this.moveStep = 0;
         this.bobbingMotion = new RubADubWaterBobbingMotion();
     }
 
@@ -1648,8 +1797,8 @@ class RubADubWater {
         this.bobbingMotion.update();
 
         let dt = rubADubLibrary.getDeltaTime();
-        this.moveTime = rubADubLibrary.isMotionFrozen() ? 0 : rubADubLibrary.level.blockSpeed * dt;
-        this.uvOffset = ((this.uvOffset + (this.moveTime / this.totalLength)) % 1 + 1) % 1;
+        this.moveStep = rubADubLibrary.isMotionFrozen() ? 0 : rubADubLibrary.level.blockSpeed * dt;
+        this.uvOffset = ((this.uvOffset + (this.moveStep / this.totalLength)) % 1 + 1) % 1;
         this.frame += dt * RubADubWater.FRAME_SPEED;
 
         if (this.frame >= RubADubWater.NUMBER_OF_FRAMES) {
@@ -1916,6 +2065,7 @@ GameLibrary.prototype.onMouseButtonDown = function() {
 
     if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         rubADubLibrary.camera.onMouseButtonDown();
+//        rubADubLibrary.background.onMouseButtonDown();
     }
 };
 
@@ -1924,12 +2074,14 @@ GameLibrary.prototype.onMouseButtonUp = function() {
 
     if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         rubADubLibrary.camera.onMouseButtonUp();
+//        rubADubLibrary.background.onMouseButtonUp();
     }
 };
 
 GameLibrary.prototype.onMouseDrag = function() {
     if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         rubADubLibrary.camera.onMouseDrag();
+//        rubADubLibrary.background.onMouseDrag();
     }
 };
 

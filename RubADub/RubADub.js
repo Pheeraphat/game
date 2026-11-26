@@ -58,6 +58,7 @@ function mouseWheel(event) {
     if (game) {
         game.mouseWheel(event.delta);
     }
+
     return false;
 }
 
@@ -695,14 +696,12 @@ class RubADubCamera {
         this.previousMouse = new GamePoint(-1, -1);
     }
 
-    init() {
-        this.setDefaultState();
-
-        this.position.set(0, 0, 0);
-        this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
-        this.angle.set(this.defaultState.angle.x, this.defaultState.angle.y, this.defaultState.angle.z);
-        this.zoom = this.defaultState.zoom;
-        this.targetZoom = this.zoom;
+    applyCameraInput(deltaX, deltaY, scrollDelta, dt) {
+        let speed = this.rotationSpeed * dt * ((gameLibrary.targetFrameRate > 0) ? (gameLibrary.targetFrameRate / gameLibrary.defaultFrameRate) : 1);
+        this.angle.y = gameLibrary.warpValue(this.angle.y + (deltaX * speed), 0, TWO_PI);
+        this.angle.x = ((this.angle.x > PI) ? this.angle.x - TWO_PI : this.angle.x) - (deltaY * speed);
+        this.targetZoom = gameLibrary.clamp(this.targetZoom + scrollDelta, this.autoDriftConfig.minZoom, this.autoDriftConfig.maxZoom);
+        rubADubLibrary.background.moveBy(-deltaX, 0);
     }
 
     autoDrift(isContinued = false) {
@@ -714,6 +713,44 @@ class RubADubCamera {
         }
 
         this.isAutoDrifting = (this.autoDriftConfig.autoDriftingCooldown > 0) ? false : true;
+    }
+
+    init() {
+        this.setDefaultState();
+
+        this.position.set(0, 0, 0);
+        this.lookAt.set(this.autoDriftConfig.lookAt.x, this.autoDriftConfig.lookAt.y, this.autoDriftConfig.lookAt.z);
+        this.angle.set(this.defaultState.angle.x, this.defaultState.angle.y, this.defaultState.angle.z);
+        this.zoom = this.defaultState.zoom;
+        this.targetZoom = this.zoom;
+    }
+
+    onMouseButtonDown() {
+        this.isDragging = true;
+        this.isAutoDrifting = false;
+        this.isResetting = false;
+        this.autoDriftConfig.driftBlend = 0;
+        this.previousMouse.set(mouseX, mouseY);
+    }
+
+    onMouseButtonUp() {
+        if (this.isDragging) {
+            this.isDragging = false;
+            this.autoDrift(true);
+        }
+    }
+
+    onMouseDrag() {
+        if (this.isDragging) {
+            let delta = new GamePoint(mouseX - this.previousMouse.x, mouseY - this.previousMouse.y);
+            this.applyCameraInput(delta.x, delta.y, 0, rubADubLibrary.getDeltaTime());
+            this.previousMouse.set(mouseX, mouseY);
+        }
+    }
+
+    onMouseWheel(delta) {
+        this.applyCameraInput(0, 0, delta * 0.25, 0);
+        this.autoDrift(true);
     }
 
     reset() {
@@ -746,18 +783,6 @@ class RubADubCamera {
         this.previousMouse.set(-1, -1);
     }
 
-    applyCameraInput(deltaX, deltaY, scrollDelta, dt) {
-        let speed = this.rotationSpeed * dt * ((gameLibrary.targetFrameRate > 0) ? (gameLibrary.targetFrameRate / gameLibrary.defaultFrameRate) : 1);
-        this.angle.y = gameLibrary.warpValue(this.angle.y + (deltaX * speed), 0, TWO_PI);
-
-        let signedAngleX = (this.angle.x > PI) ? this.angle.x - TWO_PI : this.angle.x;
-        signedAngleX = constrain(signedAngleX - (deltaY * speed), -this.autoDriftConfig.maxUpAngle, this.autoDriftConfig.maxDownAngle);
-        this.angle.x = gameLibrary.warpValue(signedAngleX, 0, TWO_PI);
-
-        this.targetZoom = constrain(this.targetZoom + scrollDelta, this.autoDriftConfig.minZoom, this.autoDriftConfig.maxZoom);
-        rubADubLibrary.background.moveBy(-deltaX, 0);
-    }
-
     update() {
         let dt = rubADubLibrary.getDeltaTime();
 
@@ -776,7 +801,7 @@ class RubADubCamera {
         // move camera up to duck y position
         if (this.autoDriftConfig.duck == null) {
             let level = rubADubLibrary.level;
-            let cameraHeightRange = (this.defaultState.lookAtHeight * 3) * level.block.size.y;
+            let cameraHeightRange = (this.defaultState.lookAtHeight * 4) * level.block.size.y;
             let duckY = abs(level.duck.position.y - level.duck.onWaterY);
             let extendedHeight = int(duckY / cameraHeightRange);
 
@@ -842,40 +867,15 @@ class RubADubCamera {
             }
         }
 
+        this.angle.x = gameLibrary.clamp(this.angle.x, -this.autoDriftConfig.maxUpAngle, this.autoDriftConfig.maxDownAngle);
+        rubADubLibrary.background.moveTo(rubADubLibrary.background.targetX, this.lookAt.y + (this.angle.x * rubADubLibrary.background.maxY * 0.5));
+
         this.position.x = this.lookAt.x - this.zoom * cos(this.angle.x) * sin(this.angle.y);
         this.position.y = this.lookAt.y + this.zoom * sin(this.angle.x);
         this.position.z = this.lookAt.z + this.zoom * cos(this.angle.x) * cos(this.angle.y);
 
         perspective(this.fov, gameLibrary.displayWidth / gameLibrary.displayHeight, 0.01, 2000);
         camera(this.position.x, this.position.y, this.position.z, this.lookAt.x, this.lookAt.y, this.lookAt.z, 0, 1, 0);
-    }
-
-    onMouseButtonDown() {
-        this.isDragging = true;
-        this.isAutoDrifting = false;
-        this.isResetting = false;
-        this.autoDriftConfig.driftBlend = 0;
-        this.previousMouse.set(mouseX, mouseY);
-    }
-
-    onMouseDrag() {
-        if (this.isDragging) {
-            let delta = new GamePoint(mouseX - this.previousMouse.x, mouseY - this.previousMouse.y);
-            this.applyCameraInput(delta.x, delta.y, 0, rubADubLibrary.getDeltaTime());
-            this.previousMouse.set(mouseX, mouseY);
-        }
-    }
-
-    onMouseButtonUp() {
-        if (this.isDragging) {
-            this.isDragging = false;
-            this.autoDrift(true);
-        }
-    }
-
-    onMouseWheel(delta) {
-        this.applyCameraInput(0, 0, delta * 0.25, 0);
-        this.autoDrift(true);
     }
 }
 
@@ -911,43 +911,10 @@ class RubADubDuck extends RubADubModel {
         this.setOnWater();
     }
 
-    reset() {
-        this.onBlock = null;
-    }
-
     changeModel(modelArrayIndex, gameImageArrayIndex) {
         super.setModel(modelArrayIndex, gameImageArrayIndex);
         this.initCollisionSize();
         this.setOnWater();
-    }
-
-    initCollisionSize() {
-        this.size.y = rubADubLibrary.level.block.size.y;
-        this.halfSize.y = rubADubLibrary.level.block.halfSize.y;
-        this.collisionSize.x = this.size.x * 0.96;
-        this.collisionHalfSize = gameLibrary.vector.scale(this.collisionSize, 0.5);
-    }
-
-    setOnWater() {
-        this.onWaterY = rubADubLibrary.level.pool.water.position.y - this.halfSize.y;
-
-        if (this.onBlock != null) {
-            this.onBlockY = this.onBlock.position.y - this.onBlock.halfSize.y - this.halfSize.y;
-            this.position.y = this.onBlockY;
-        } else if (!this.isJumping) {
-            this.position.y = this.onWaterY;
-        }
-    }
-
-    setOnBlock(block) {
-        if (block == null) {
-            this.onBlock = null;
-        } else if (this.onBlock != block) {
-            this.onBlock = block;
-            this.onBlockY = this.onBlock.position.y - this.onBlock.halfSize.y - this.halfSize.y;
-            this.position.y = this.onBlockY;
-            this.isJumping = false;
-        }
     }
 
     init() {
@@ -970,6 +937,47 @@ class RubADubDuck extends RubADubModel {
         this.setOnWater();
 
         this.soapBubble.clear();
+    }
+
+    initCollisionSize() {
+        this.size.y = rubADubLibrary.level.block.size.y;
+        this.halfSize.y = rubADubLibrary.level.block.halfSize.y;
+        this.collisionSize.x = this.size.x * 0.96;
+        this.collisionHalfSize = gameLibrary.vector.scale(this.collisionSize, 0.5);
+    }
+
+    render() {
+        this.update();
+        let level = rubADubLibrary.level;
+        super.render(this.position.x, this.position.y);
+        level.followingDuckling.render();
+        this.soapBubble.render();
+    }
+
+    reset() {
+        this.onBlock = null;
+    }
+
+    setOnBlock(block) {
+        if (block == null) {
+            this.onBlock = null;
+        } else if (this.onBlock != block) {
+            this.onBlock = block;
+            this.onBlockY = this.onBlock.position.y - this.onBlock.halfSize.y - this.halfSize.y;
+            this.position.y = this.onBlockY;
+            this.isJumping = false;
+        }
+    }
+
+    setOnWater() {
+        this.onWaterY = rubADubLibrary.level.pool.water.position.y - this.halfSize.y;
+
+        if (this.onBlock != null) {
+            this.onBlockY = this.onBlock.position.y - this.onBlock.halfSize.y - this.halfSize.y;
+            this.position.y = this.onBlockY;
+        } else if (!this.isJumping) {
+            this.position.y = this.onWaterY;
+        }
     }
 
     startJumping(jumpForce) {
@@ -1044,14 +1052,6 @@ class RubADubDuck extends RubADubModel {
 
             level.followingDuckling.addMomAction(this.position.y, this.offset.y, this.angle.z);
         }
-    }
-
-    render() {
-        this.update();
-        let level = rubADubLibrary.level;
-        super.render(this.position.x, this.position.y);
-        level.followingDuckling.render();
-        this.soapBubble.render();
     }
 }
 
@@ -1192,83 +1192,83 @@ class RubADubLevel {
                              "   X             XXXXXX   XXXX     X                                    ",
                              "X  A                  A       AAAAA   X    A    A    A     XAAA     AX A"
                             ]);
-/*
-        // 4
-        this.dataArray.push(["                                                              X                                                                  ",
-                             "                                                          X   O     A                                                            ",
-                             "                                                      X                                                                          ",
-                             "                    XXXX                          X           A                                                                 A",
-                             "A     AA   AA   AA        AAA  AAA   A     AAAX       A  XXXXXX    X         AA     A      AA       AAA     AAAX  X    X    X    "
-                            ]);
+        /*
+         // 4
+         this.dataArray.push(["                                                              X                                                                  ",
+         "                                                          X   O     A                                                            ",
+         "                                                      X                                                                          ",
+         "                    XXXX                          X           A                                                                 A",
+         "A     AA   AA   AA        AAA  AAA   A     AAAX       A  XXXXXX    X         AA     A      AA       AAA     AAAX  X    X    X    "
+         ]);
 
-        // 5
-        this.dataArray.push(["                                                                                                                                                       AA              ",
-                             "                                                                                                                                                   X                   ",
-                             "                                                                                                                                               X                       ",
-                             "                                                                                                            XXXXXXX    X    X    X    X    X                           ",
-                             "                                                                                        XXXX      XXXXXXX                                            X                 ",
-                             "                                                                   XXXXX      XXXXXXX         X                                                  X                     ",
-                             "                                                     A    XX   XX         X                                AA                             XXXX             O           ",
-                             "                                                XXXXXXXX                                AAAAAAAAAAA                                                                    ",
-                             "A     XA    A      AA       XA    AAAX      X                       AAA        XA  AX                     XXXX    XAAAA     A         AA          AAA    A  X         A"
-                            ]);
+         // 5
+         this.dataArray.push(["                                                                                                                                                       AA              ",
+         "                                                                                                                                                   X                   ",
+         "                                                                                                                                               X                       ",
+         "                                                                                                            XXXXXXX    X    X    X    X    X                           ",
+         "                                                                                        XXXX      XXXXXXX                                            X                 ",
+         "                                                                   XXXXX      XXXXXXX         X                                                  X                     ",
+         "                                                     A    XX   XX         X                                AA                             XXXX             O           ",
+         "                                                XXXXXXXX                                AAAAAAAAAAA                                                                    ",
+         "A     XA    A      AA       XA    AAAX      X                       AAA        XA  AX                     XXXX    XAAAA     A         AA          AAA    A  X         A"
+         ]);
 
-        // 6
-        this.dataArray.push(["                               A           A                                                                                                                                                         ",
-                             "                             XXXXXXXXXXX      A                                                                                                                                                      ",
-                             "                         XX               X                                                                                                                                                          ",
-                             "                    XX                       X      XXXXXXXXXX    O                                             A                                                 A               A                 A",
-                             "          XXXXXXX                               X      A                     X                                XXX                             X                   X             XXX                 X",
-                             "      X                                            X      AA            X          X          AAA        X          X          AAA       X          X         X            X          X         X    ",
-                             "AX                                                  AAX        A   X    A          AAAAAAX          X    A          AAAAAAX         X    A          AAAAAAX   A       X    A          AAAAAAX   A    "
-                            ]);
+         // 6
+         this.dataArray.push(["                               A           A                                                                                                                                                         ",
+         "                             XXXXXXXXXXX      A                                                                                                                                                      ",
+         "                         XX               X                                                                                                                                                          ",
+         "                    XX                       X      XXXXXXXXXX    O                                             A                                                 A               A                 A",
+         "          XXXXXXX                               X      A                     X                                XXX                             X                   X             XXX                 X",
+         "      X                                            X      AA            X          X          AAA        X          X          AAA       X          X         X            X          X         X    ",
+         "AX                                                  AAX        A   X    A          AAAAAAX          X    A          AAAAAAX         X    A          AAAAAAX   A       X    A          AAAAAAX   A    "
+         ]);
 
-        // 7
-        this.dataArray.push(["                                                                                                 X    X    X    X    X    AA                ",
-                             "                                                                                           AX              AAAAAAAAO                        ",
-                             "                                                                                     XXXXXXXXXXXXXXXXXX                                     ",
-                             "                                                                    A            XX                    XXXX                                 ",
-                             "                                                            XXXXXXXXXXXXXXXXXX                               X       O                      ",
-                             "                                                        XX                                                      X                           ",
-                             "                    AA                             XX                   A                        A                                          ",
-                             "X    XAAAA     XX        A     AA     AAA      X                        X                        X                       XA            AAXAA",
-                            ]);
+         // 7
+         this.dataArray.push(["                                                                                                 X    X    X    X    X    AA                ",
+         "                                                                                           AX              AAAAAAAAO                        ",
+         "                                                                                     XXXXXXXXXXXXXXXXXX                                     ",
+         "                                                                    A            XX                    XXXX                                 ",
+         "                                                            XXXXXXXXXXXXXXXXXX                               X       O                      ",
+         "                                                        XX                                                      X                           ",
+         "                    AA                             XX                   A                        A                                          ",
+         "X    XAAAA     XX        A     AA     AAA      X                        X                        X                       XA            AAXAA",
+         ]);
 
-        // 8
-        this.dataArray.push(["                                                                                                                     AAAAAA                                      ",
-                             "                                                                                                                 X                  AA                           ",
-                             "                                                                                                             X      XXXXXXXX    X                                ",
-                             "                                                                                                X       X                   AAAA AAX                             ",
-                             "                                                                                            X      XXAAA                            AAX                          ",
-                             "                                                                               X       X                                               AAX                       ",
-                             "                                                                           X      XXAAA                                                   AAX      AAAAAA        ",
-                             "                                                  AAA         X       X                                                                      AAX              X  ",
-                             "                                              X           X      XXAAA            A                A                A                           AAXXXXXXXX      O",
-                             "        AAA  AAAX               X    X    X   A      XAAAA       A                X                X                X                                         A  ",
-                            ]);
+         // 8
+         this.dataArray.push(["                                                                                                                     AAAAAA                                      ",
+         "                                                                                                                 X                  AA                           ",
+         "                                                                                                             X      XXXXXXXX    X                                ",
+         "                                                                                                X       X                   AAAA AAX                             ",
+         "                                                                                            X      XXAAA                            AAX                          ",
+         "                                                                               X       X                                               AAX                       ",
+         "                                                                           X      XXAAA                                                   AAX      AAAAAA        ",
+         "                                                  AAA         X       X                                                                      AAX              X  ",
+         "                                              X           X      XXAAA            A                A                A                           AAXXXXXXXX      O",
+         "        AAA  AAAX               X    X    X   A      XAAAA       A                X                X                X                                         A  ",
+         ]);
 
-        // 9
-        this.dataArray.push(["                                                                                                                                                                                        AA       ",
-                             "                                                                                                                                                                 XXXXXXXXXAAAAXAAAAX             ",
-                             "                                                                                                                                                    XXXXXXXXXXXXX                                ",
-                             "                                                                                                                                               XX                                                ",
-                             "                                                                                                           AA                             XXXXX                                                  ",
-                             "                                                                                                       X                             XXXXX                                                       ",
-                             "                                                                                                   XAAAA            A            XXXX                                                            ",
-                             "                                                                                              XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                                                                 ",
-                             "                                                                                        XXXXXX                                                                                                   ",
-                             "                                                                    X       X       X                                                                                                            ",
-                             "                                                                X      XAAA    XAAA                                                                                                              ",
-                             "                                                          X                                                                                                                                      ",
-                             "                                                     X                                                                                                                                           ",
-                             "                       AAAAA                    X                                                                                                                                                ",
-                             "                                 X    X    X                                                                                                                                                     ",
-                             "       AAAAAA         XXXXXXX                                                                                                                                                                    ",
-                             "                  X                                                                                                                                          O                             XXX   ",
-                             "    AXXXXXXXXX                   A                        A            A                                     A                                        AXXXX                                      ",
-                             "XXX           AAAAA              X                        X            X                                     X                                            AAAAA               XAAAAX          AAA",
-                            ]);
-*/
+         // 9
+         this.dataArray.push(["                                                                                                                                                                                        AA       ",
+         "                                                                                                                                                                 XXXXXXXXXAAAAXAAAAX             ",
+         "                                                                                                                                                    XXXXXXXXXXXXX                                ",
+         "                                                                                                                                               XX                                                ",
+         "                                                                                                           AA                             XXXXX                                                  ",
+         "                                                                                                       X                             XXXXX                                                       ",
+         "                                                                                                   XAAAA            A            XXXX                                                            ",
+         "                                                                                              XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                                                                 ",
+         "                                                                                        XXXXXX                                                                                                   ",
+         "                                                                    X       X       X                                                                                                            ",
+         "                                                                X      XAAA    XAAA                                                                                                              ",
+         "                                                          X                                                                                                                                      ",
+         "                                                     X                                                                                                                                           ",
+         "                       AAAAA                    X                                                                                                                                                ",
+         "                                 X    X    X                                                                                                                                                     ",
+         "       AAAAAA         XXXXXXX                                                                                                                                                                    ",
+         "                  X                                                                                                                                          O                             XXX   ",
+         "    AXXXXXXXXX                   A                        A            A                                     A                                        AXXXX                                      ",
+         "XXX           AAAAA              X                        X            X                                     X                                            AAAAA               XAAAAX          AAA",
+         ]);
+         */
         this.time = 0;
         this.duckType = 0;
         this.duck = null;
@@ -1448,6 +1448,7 @@ class RubADubLevel {
 class RubADubParallaxBackground {
     constructor(maxZoom = 1.3, smoothness = 10 / 1000) {
         this.layers = [];
+        this.maxY = 0;
         this.maxZoom = maxZoom;
         this.smoothness = smoothness;
 
@@ -1471,6 +1472,8 @@ class RubADubParallaxBackground {
             let speedRatio = (maxSpeed > 0) ? layer.speed / maxSpeed : 0;
             layer.zoom = 1 + (this.maxZoom - 1) * speedRatio;
         }
+
+        this.maxY = this.getMaxPanY();
     }
 
     getAspectCoverSize(img, targetW, targetH, minZoom) {
@@ -1493,40 +1496,10 @@ class RubADubParallaxBackground {
         return maxPanY;
     }
 
-    render() {
-        if (this.layers.length > 0) {
-            let dt = rubADubLibrary.getDeltaTime();
-            let smoothFactor = 1 - exp(-this.smoothness * dt);
-            this.currentX = lerp(this.currentX, this.targetX, smoothFactor);
-            this.currentY = lerp(this.currentY, this.targetY, smoothFactor);
-
-            push();
-            for (let layer of this.layers) {
-                let size = this.getAspectCoverSize(layer.img, gameLibrary.displayWidth, gameLibrary.displayHeight, layer.zoom);
-                let centerX = (gameLibrary.displayWidth - size.w) / 2;
-                let centerY = (gameLibrary.displayHeight - size.h) / 2;
-
-                if (layer.speed === 0) {
-                    image(layer.img, centerX, centerY, size.w, size.h);
-                } else {
-                    let y = constrain(centerY + this.currentY * layer.speed, gameLibrary.displayHeight - size.h, 0);
-                    let rawX = centerX + this.currentX * layer.speed;
-                    let wrappedX = ((rawX % size.w) - size.w) % size.w;
-
-                    for (let drawX = wrappedX; drawX < gameLibrary.displayWidth; drawX += size.w) {
-                        image(layer.img, drawX, y, size.w, size.h);
-                    }
-                }
-            }
-            pop();
-        }
-    }
-
     moveBy(dx = 0, dy = 0) {
         if (this.layers.length > 0) {
-            let maxY = this.getMaxPanY();
             this.targetX += dx;
-            this.targetY = constrain(this.targetY + dy, -maxY, maxY);
+            this.targetY = gameLibrary.clamp(this.targetY + dy, -this.maxY, this.maxY);
             this.savedOffsetX = this.targetX;
             this.savedOffsetY = this.targetY;
         }
@@ -1534,9 +1507,8 @@ class RubADubParallaxBackground {
 
     moveTo(x = 0, y = 0) {
         if (this.layers.length > 0) {
-            let maxY = this.getMaxPanY();
             this.targetX = x;
-            this.targetY = constrain(y, -maxY, maxY);
+            this.targetY = gameLibrary.clamp(y, -this.maxY, this.maxY);
 
             this.savedOffsetX = this.targetX;
             this.savedOffsetY = this.targetY;
@@ -1547,22 +1519,50 @@ class RubADubParallaxBackground {
         this.isDragging = true;
     }
 
-    onMouseDrag() {
-        if (this.isDragging) {
-            let maxY = this.getMaxPanY();
-            let rawX = this.savedOffsetX - (mouseX - gameLibrary.touchBeganPoint.x);
-            let rawY = this.savedOffsetY + (mouseY - gameLibrary.touchBeganPoint.y);
-
-            this.targetX = rawX;
-            this.targetY = constrain(rawY, -maxY, maxY);
-        }
-    }
-
     onMouseButtonUp() {
         if (this.isDragging) {
             this.isDragging = false;
             this.savedOffsetX = this.targetX;
             this.savedOffsetY = this.targetY;
+        }
+    }
+
+    onMouseDrag() {
+        if (this.isDragging) {
+            let rawX = this.savedOffsetX - (mouseX - gameLibrary.touchBeganPoint.x);
+            let rawY = this.savedOffsetY + (mouseY - gameLibrary.touchBeganPoint.y);
+
+            this.targetX = rawX;
+            this.targetY = gameLibrary.clamp(rawY, -this.maxY, this.maxY);
+        }
+    }
+
+    render() {
+        if (this.layers.length > 0) {
+            let dt = rubADubLibrary.getDeltaTime();
+            let smoothFactor = 1 - exp(-this.smoothness * dt);
+            this.currentX = lerp(this.currentX, this.targetX, smoothFactor);
+            this.currentY = lerp(this.currentY, this.targetY, smoothFactor);
+
+            push();
+            for (let layer of this.layers) {
+                let size = this.getAspectCoverSize(layer.img, gameLibrary.displayWidth, gameLibrary.displayHeight, layer.zoom);
+                let centerX = (gameLibrary.displayWidth - size.w) * 0.5;
+                let centerY = (gameLibrary.displayHeight - size.h) * 0.5;
+
+                if (layer.speed === 0) {
+                    image(layer.img, centerX, centerY, size.w, size.h);
+                } else {
+                    let y = gameLibrary.clamp(centerY + this.currentY * layer.speed, gameLibrary.displayHeight - size.h, 0);
+                    let rawX = centerX + this.currentX * layer.speed;
+                    let wrappedX = ((rawX % size.w) - size.w) % size.w;
+
+                    for (let drawX = wrappedX; drawX < gameLibrary.displayWidth; drawX += size.w) {
+                        image(layer.img, drawX, y, size.w, size.h);
+                    }
+                }
+            }
+            pop();
         }
     }
 
@@ -1583,8 +1583,8 @@ class RubADubParallaxBackground {
     }
 
     resize() {
-        let maxY = this.getMaxPanY();
-        this.targetY = constrain(this.targetY, -maxY, maxY);
+        this.maxY = this.getMaxPanY();
+        this.targetY = gameLibrary.clamp(this.targetY, -this.maxY, this.maxY);
         this.savedOffsetY = this.targetY;
     }
 }
@@ -2051,7 +2051,7 @@ GameLibrary.prototype.onLoad = function() {
     this.addSoundFilename(RubADubLibrary.SOUND_FINISHED,           "Finished");
     this.addSoundFilename(RubADubLibrary.SOUND_GAME_OVER,          "GameOver");
 
-    //    this.fontInit("EraserRegular.ttf");
+//    this.fontInit("EraserRegular.ttf");
     this.useDefaultFrameRate();
     this.isWebGLEnabled = true;
     this.camera.isEnabled = false;
@@ -2065,7 +2065,6 @@ GameLibrary.prototype.onMouseButtonDown = function() {
 
     if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         rubADubLibrary.camera.onMouseButtonDown();
-//        rubADubLibrary.background.onMouseButtonDown();
     }
 };
 
@@ -2074,14 +2073,12 @@ GameLibrary.prototype.onMouseButtonUp = function() {
 
     if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         rubADubLibrary.camera.onMouseButtonUp();
-//        rubADubLibrary.background.onMouseButtonUp();
     }
 };
 
 GameLibrary.prototype.onMouseDrag = function() {
     if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         rubADubLibrary.camera.onMouseDrag();
-//        rubADubLibrary.background.onMouseDrag();
     }
 };
 

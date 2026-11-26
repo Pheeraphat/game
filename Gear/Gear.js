@@ -57,6 +57,8 @@ function mouseWheel(event) {
     if (game) {
         game.mouseWheel(event.delta);
     }
+
+    return false;
 }
 
 function mouseReleased() {

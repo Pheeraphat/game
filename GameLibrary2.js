@@ -3858,7 +3858,7 @@ class GameParticle {
         this.elementArray[i].topLeftPoint.x = this.elementArray[i].centerVector.x - halfSize;
         this.elementArray[i].topLeftPoint.y = this.elementArray[i].centerVector.y - halfSize;
 
-        if (halfSize <= 0.0 || this.elementArray[i].centerVector.x < -halfSize || this.elementArray[i].centerVector.x > this.parent.offscreen.displayWidth + halfSize || this.elementArray[i].centerVector.y < -halfSize || this.elementArray[i].centerVector.y > this.parent.offscreen.displayHeight + halfSize) {
+        if (halfSize <= 0.0 || this.elementArray[i].lifespan == 0.0 || this.elementArray[i].centerVector.x < -halfSize || this.elementArray[i].centerVector.x > this.parent.offscreen.displayWidth + halfSize || this.elementArray[i].centerVector.y < -halfSize || this.elementArray[i].centerVector.y > this.parent.offscreen.displayHeight + halfSize) {
             this.elementArray[i].lifespan = 0.0;
             this.elementArray.splice(i, 1);
             isDead = true;

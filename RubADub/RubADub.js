@@ -169,8 +169,8 @@ class RubADubLibrary {
 
     // button
     static get BUTTON_PAUSE()             {return  1;}
-    static get BUTTON_PLAY()              {return  2;}
-    static get BUTTON_CONTINUE()          {return  3;}
+    static get BUTTON_CONTINUE()          {return  2;}
+    static get BUTTON_NEW_GAME()          {return  3;}
 
     // game mode
     static get GAME_MODE_NEW_GAME()       {return  0;}
@@ -188,35 +188,36 @@ class RubADubLibrary {
     static get PIXELS_BETWEEN_WORDS()     {return  4;}
 
     constructor() {
+        this.deltaTime = 0;
         this.isDebug = false;
+        this.isYesOrNo = false;
         this.isJustStarted = true;
+        this.isMouseButtonDown = false;
         this.isNewGame = true;
         this.isGameOver = false;
         this.isGameFinished = false;
         this.isGamePaused = false;
         this.isTryAgain = false;
         this.isContinued = false;
-        this.isMouseButtonDown = false;
-
-        this.deltaTime = 0;
 
         // menu
-        this.buttonPlayImageIndex = RubADubLibrary.IMAGE_NEW_GAME_0;
+        this.buttonContinueImageIndex = RubADubLibrary.IMAGE_CONTINUE_0;
 
         // blink
         this.levelBlink = new RubADubBlink(500, 3000);
 
         // hud
+        this.infoType = RubADubLibrary.INFO_TYPE_NONE;
         this.pixelsBetweenWords = 0;
         this.spacesBetweenDigits = 0;
         this.levelScaledSize = new GameSize();
-        this.infoType = RubADubLibrary.INFO_TYPE_NONE;
         this.infoScaledRectArray = new Array(RubADubLibrary.NUMBER_OF_INFO_TYPES).fill(new GameRect());
 
         // object
         this.camera = new RubADubCamera();
         this.level = new RubADubLevel();
         this.background = new RubADubParallaxBackground();
+        this.cookie = new RubADubCookie();
     }
 
     canCheckCollision() {
@@ -261,8 +262,6 @@ class RubADubLibrary {
 
         this.newGame();
         this.resize();
-
-        gameLibrary.changeGameMode(RubADubLibrary.GAME_MODE_MENU);
     }
 
     isMotionFrozen() {
@@ -270,7 +269,7 @@ class RubADubLibrary {
     }
 
     newGame() {
-        gameLibrary.showButton(RubADubLibrary.BUTTON_PLAY, false);
+        gameLibrary.showButton(RubADubLibrary.BUTTON_NEW_GAME, false);
         gameLibrary.showButton(RubADubLibrary.BUTTON_CONTINUE, false);
         gameLibrary.showButton(RubADubLibrary.BUTTON_PAUSE, true);
 
@@ -279,9 +278,9 @@ class RubADubLibrary {
         this.level.isLoadFirstLevel = false;
 
         if (this.isNewGame) {
-            if (!this.isJustStarted) {
-                this.levelBlink.start();
+            this.levelBlink.start();
 
+            if (!this.isJustStarted) {
                 if (!this.isTryAgain) {
                     this.level.isLoadFirstLevel = true;
 
@@ -383,7 +382,7 @@ class RubADubLibrary {
         if (this.level.numberOfLevels > 1) {
             this.levelBlink.update();
 
-            if (this.levelBlink.isVisibled) {
+            if (this.levelBlink.isVisibled && (rubADubLibrary.isGamePaused || rubADubLibrary.isContinued || rubADubLibrary.isTryAgain || gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU || this.infoType == RubADubLibrary.INFO_TYPE_FINISHED)) {
                 let levelString = str(this.level.currentLevel + 1) + "/" + str(this.level.numberOfLevels);
                 let levelStringSize = gameLibrary.number.getPixelSize(levelString, RubADubLibrary.IMAGE_DIGIT_0, this.spacesBetweenDigits);
                 let totalWidth = this.levelScaledSize.width + this.pixelsBetweenWords + levelStringSize.width;
@@ -401,8 +400,8 @@ class RubADubLibrary {
             image(gameLibrary.gameImageArray[imageArrayIndex].image, this.infoScaledRectArray[this.infoType].x, y, this.infoScaledRectArray[this.infoType].width, this.infoScaledRectArray[this.infoType].height);
         }
 
-        gameLibrary.renderButton(RubADubLibrary.BUTTON_CONTINUE, RubADubLibrary.IMAGE_CONTINUE_0);
-        gameLibrary.renderButton(RubADubLibrary.BUTTON_PLAY, this.buttonPlayImageIndex);
+        gameLibrary.renderButton(RubADubLibrary.BUTTON_CONTINUE, this.buttonContinueImageIndex);
+        gameLibrary.renderButton(RubADubLibrary.BUTTON_NEW_GAME, RubADubLibrary.IMAGE_NEW_GAME_0);
         gameLibrary.renderButton(GameLibrary.BUTTON_FULLSCREEN, RubADubLibrary.IMAGE_ENTER_FULLSCREEN_0);
         gameLibrary.renderButton(RubADubLibrary.BUTTON_PAUSE, RubADubLibrary.IMAGE_PAUSE_0);
 
@@ -412,15 +411,15 @@ class RubADubLibrary {
 
     resize() {
         // button
-        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].width = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_NEW_GAME_0].width);
-        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].height = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_NEW_GAME_0].height);
-        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].x = int((gameLibrary.displayWidth - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].width) * 0.5);
-        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].y = gameLibrary.displayHeight - gameLibrary.hudGap - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].height;
+        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].width = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_NEW_GAME_0].width);
+        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].height = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_NEW_GAME_0].height);
+        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].x = int((gameLibrary.displayWidth - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].width) * 0.5);
+        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].y = gameLibrary.displayHeight - gameLibrary.hudGap - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].height;
 
         gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].width = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_CONTINUE_0].width);
         gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].height = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_CONTINUE_0].height);
         gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].x = int((gameLibrary.displayWidth - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].width) * 0.5);
-        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].y = gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].y - gameLibrary.hudGap - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].height;
+        gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].y = gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].y - gameLibrary.hudGap - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].height;
 
         gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PAUSE].width = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_PAUSE_0].width);
         gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PAUSE].height = gameLibrary.scale(gameLibrary.gameImageArray[RubADubLibrary.IMAGE_PAUSE_0].height);
@@ -429,7 +428,7 @@ class RubADubLibrary {
 
         gameLibrary.buttonOffsetSizeArray[RubADubLibrary.BUTTON_PAUSE].width = -(gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PAUSE].width + gameLibrary.hudGap);
         gameLibrary.buttonOffsetSizeArray[RubADubLibrary.BUTTON_CONTINUE].height = gameLibrary.buttonFullscreenOffsetPoint.y - gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_CONTINUE].y;
-        gameLibrary.buttonOffsetSizeArray[RubADubLibrary.BUTTON_PLAY].height = gameLibrary.buttonOffsetSizeArray[RubADubLibrary.BUTTON_CONTINUE].height + gameLibrary.hudGap + gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_PLAY].height;
+        gameLibrary.buttonOffsetSizeArray[RubADubLibrary.BUTTON_NEW_GAME].height = gameLibrary.buttonOffsetSizeArray[RubADubLibrary.BUTTON_CONTINUE].height + gameLibrary.hudGap + gameLibrary.buttonRectArray[RubADubLibrary.BUTTON_NEW_GAME].height;
 
         // level
         this.pixelsBetweenWords = gameLibrary.scale(RubADubLibrary.PIXELS_BETWEEN_WORDS * gameLibrary.imageFileScale);
@@ -447,38 +446,6 @@ class RubADubLibrary {
         }
 
         this.background.resize();
-    }
-}
-
-////////////////////////////////////////////////////////////
-// blink
-////////////////////////////////////////////////////////////
-class RubADubBlink {
-    constructor(interval, duration) {
-        this.interval = interval;
-        this.duration = duration;
-        this.elapsedTime = this.duration;
-        this.isBlinking = false;
-        this.isVisibled = true;
-    }
-
-    start() {
-        this.elapsedTime = 0;
-        this.isBlinking = true;
-    }
-
-    update() {
-        this.isVisibled = true;
-
-        if (this.elapsedTime < this.duration) {
-            this.isVisibled = (gameLibrary.getMilliseconds() % this.interval) < (this.interval * 0.5);
-            this.elapsedTime += rubADubLibrary.getDeltaTime();
-
-            if (this.elapsedTime >= this.duration) {
-                this.elapsedTime = this.duration;
-                this.isBlinking = false;
-            }
-        }
     }
 }
 
@@ -571,14 +538,48 @@ class RubADubModel {
     setModel(modelArrayIndex, gameImageArrayIndex) {
         this.modelArrayIndex = modelArrayIndex;
         this.gameImageArrayIndex = gameImageArrayIndex;
-
         let boundingBox = gameLibrary.modelArray[modelArrayIndex].calculateBoundingBox();
-        console.log("model", this.modelArrayIndex, "boundingBox:", boundingBox.size.x, boundingBox.size.y, boundingBox.size.z);
+
+        if (rubADubLibrary.isDebug) {
+            console.log("model", this.modelArrayIndex, "boundingBox:", boundingBox.size.x, boundingBox.size.y, boundingBox.size.z);
+        }
 
         this.size.set(boundingBox.size.x, boundingBox.size.y, boundingBox.size.z);
         this.halfSize = gameLibrary.vector.scale(this.size, 0.5);
         this.collisionSize = gameLibrary.vector.scale(this.size, 1.0);
         this.collisionHalfSize = gameLibrary.vector.scale(this.halfSize, 1.0);
+    }
+}
+
+////////////////////////////////////////////////////////////
+// blink
+////////////////////////////////////////////////////////////
+class RubADubBlink {
+    constructor(interval, duration) {
+        this.interval = interval;
+        this.duration = duration;
+        this.elapsedTime = this.duration;
+        this.isBlinking = false;
+        this.isVisibled = true;
+    }
+
+    start() {
+        this.elapsedTime = 0;
+        this.isBlinking = true;
+    }
+
+    update() {
+        this.isVisibled = true;
+
+        if (gameLibrary.gameMode != RubADubLibrary.GAME_MODE_MENU && this.elapsedTime < this.duration) {
+            this.isVisibled = (gameLibrary.getMilliseconds() % this.interval) < (this.interval * 0.5);
+            this.elapsedTime += rubADubLibrary.getDeltaTime();
+
+            if (this.elapsedTime >= this.duration) {
+                this.elapsedTime = this.duration;
+                this.isBlinking = false;
+            }
+        }
     }
 }
 
@@ -880,6 +881,240 @@ class RubADubCamera {
 }
 
 ////////////////////////////////////////////////////////////
+// cookie
+////////////////////////////////////////////////////////////
+class RubADubCookie {
+    constructor() {
+        gameLibrary.cookie.setKey("Dub-a-Dub.1.0.0");
+    }
+
+    delete() {
+        gameLibrary.cookie.isConsoleLogVisibled = rubADubLibrary.isDebug;
+
+        if (gameLibrary.cookie.isConsoleLogVisibled) {
+            console.log("\ndelete cookie...");
+        }
+
+        gameLibrary.cookie.deleteSection(gameLibrary.cookie.key);
+
+        let sectionName = "rubADubLibrary";
+        gameLibrary.cookie.deleteValue(sectionName, "isNewGame");
+        gameLibrary.cookie.deleteValue(sectionName, "isGameOver");
+        gameLibrary.cookie.deleteValue(sectionName, "isGameFinished");
+        gameLibrary.cookie.deleteValue(sectionName, "isGamePaused");
+        gameLibrary.cookie.deleteValue(sectionName, "isTryAgain");
+        gameLibrary.cookie.deleteValue(sectionName, "isContinued");
+        gameLibrary.cookie.deleteValue(sectionName, "buttonContinueImageIndex");
+        gameLibrary.cookie.deleteValue(sectionName, "infoType");
+        gameLibrary.cookie.deleteSection(sectionName);
+
+        sectionName = "rubADubLibrary.levelBlink";
+        gameLibrary.cookie.deleteValue(sectionName, "interval");
+        gameLibrary.cookie.deleteValue(sectionName, "duration");
+        gameLibrary.cookie.deleteValue(sectionName, "elapsedTime");
+        gameLibrary.cookie.deleteValue(sectionName, "isBlinking");
+        gameLibrary.cookie.deleteValue(sectionName, "isVisibled");
+        gameLibrary.cookie.deleteSection(sectionName);
+
+        sectionName = "rubADubLibrary.level";
+        gameLibrary.cookie.deleteValue(sectionName, "currentLevel");
+        gameLibrary.cookie.deleteValue(sectionName, "isLoadFirstLevel");
+        gameLibrary.cookie.deleteValue(sectionName, "isClearingBlocks");
+        gameLibrary.cookie.deleteValue(sectionName, "clearingBlocksFactor");
+        gameLibrary.cookie.deleteValue(sectionName, "blockMoveLength");
+        gameLibrary.cookie.deleteSection(sectionName);
+
+
+        sectionName = "rubADubLibrary.level.duck";
+        gameLibrary.cookie.deleteValue(sectionName, "modelArrayIndex");
+        gameLibrary.cookie.deleteValue(sectionName, "position");
+        gameLibrary.cookie.deleteValue(sectionName, "angle");
+        gameLibrary.cookie.deleteValue(sectionName, "isFrontFlipping");
+        gameLibrary.cookie.deleteValue(sectionName, "isJumping");
+        gameLibrary.cookie.deleteValue(sectionName, "jumpVelocity");
+        gameLibrary.cookie.deleteValue(sectionName, "jumpAirTime");
+
+        gameLibrary.cookie.deleteSection(sectionName);
+
+        sectionName = "rubADubLibrary.level.followingDuckling";
+        gameLibrary.cookie.deleteValue(sectionName, "total");
+        gameLibrary.cookie.deleteValue(sectionName, "counter");
+        gameLibrary.cookie.deleteValue(sectionName, "isVisibledArray");
+        gameLibrary.cookie.deleteValue(sectionName, "momActionArray");
+        gameLibrary.cookie.deleteSection(sectionName);
+
+        sectionName = "gameLibrary.particle";
+        gameLibrary.cookie.deleteValue(sectionName, "elementArray");
+        gameLibrary.cookie.deleteSection(sectionName);
+    }
+
+    load() {
+        gameLibrary.cookie.isConsoleLogVisibled = rubADubLibrary.isDebug;
+
+        if (gameLibrary.cookie.isConsoleLogVisibled) {
+            console.log("\nload cookie...");
+        }
+
+        let duckModelArrayIndex = RubADubLibrary.MODEL_MOM;
+        let found = gameLibrary.cookie.loadSection(gameLibrary.cookie.key);
+
+        if (found) {
+            let sectionName = "rubADubLibrary";
+            found = gameLibrary.cookie.loadSection(sectionName);
+
+            if (found) {
+                rubADubLibrary.isNewGame = gameLibrary.cookie.loadValue(sectionName, "isNewGame", false);
+                rubADubLibrary.isGameOver = gameLibrary.cookie.loadValue(sectionName, "isGameOver", false);
+                rubADubLibrary.isGameFinished = gameLibrary.cookie.loadValue(sectionName, "isGameFinished", false);
+                rubADubLibrary.isGamePaused = gameLibrary.cookie.loadValue(sectionName, "isGamePaused", false);
+                rubADubLibrary.isTryAgain = gameLibrary.cookie.loadValue(sectionName, "isTryAgain", false);
+                rubADubLibrary.isContinued = gameLibrary.cookie.loadValue(sectionName, "isContinued", false);
+                rubADubLibrary.buttonContinueImageIndex = gameLibrary.cookie.loadValue(sectionName, "buttonContinueImageIndex", false);
+                rubADubLibrary.infoType = gameLibrary.cookie.loadValue(sectionName, "infoType", false);
+
+                sectionName = "rubADubLibrary.levelBlink";
+                found = gameLibrary.cookie.loadSection(sectionName);
+
+                if (found) {
+                    rubADubLibrary.levelBlink.interval = gameLibrary.cookie.loadValue(sectionName, "interval", 0);
+                    rubADubLibrary.levelBlink.duration = gameLibrary.cookie.loadValue(sectionName, "duration", 0);
+                    rubADubLibrary.levelBlink.elapsedTime = gameLibrary.cookie.loadValue(sectionName, "elapsedTime", 0);
+                    rubADubLibrary.levelBlink.isBlinking = gameLibrary.cookie.loadValue(sectionName, "isBlinking", false);
+                    rubADubLibrary.levelBlink.isVisibled = gameLibrary.cookie.loadValue(sectionName, "isVisibled", true);
+
+                    sectionName = "rubADubLibrary.level";
+                    found = gameLibrary.cookie.loadSection(sectionName);
+
+                    if (found) {
+                        rubADubLibrary.level.currentLevel = gameLibrary.cookie.loadValue(sectionName, "currentLevel", 0);
+                        rubADubLibrary.level.isLoadFirstLevel = gameLibrary.cookie.loadValue(sectionName, "isLoadFirstLevel", false);
+                        rubADubLibrary.level.isClearingBlocks = gameLibrary.cookie.loadValue(sectionName, "isClearingBlocks", false);
+                        rubADubLibrary.level.clearingBlocksFactor = gameLibrary.cookie.loadValue(sectionName, "clearingBlocksFactor", 0);
+                        rubADubLibrary.level.blockMoveLength = gameLibrary.cookie.loadValue(sectionName, "blockMoveLength", 0);
+
+                        sectionName = "rubADubLibrary.level.duck";
+                        found = gameLibrary.cookie.loadSection(sectionName);
+
+                        if (found) {
+                            duckModelArrayIndex = gameLibrary.cookie.loadValue(sectionName, "modelArrayIndex", RubADubLibrary.TEXTURE_MOM);
+                            rubADubLibrary.level.duck.position = gameLibrary.cookie.loadValue(sectionName, "position", gameLibrary.vector.create());
+                            rubADubLibrary.level.duck.angle = gameLibrary.cookie.loadValue(sectionName, "angle", gameLibrary.vector.create());
+                            rubADubLibrary.level.duck.isFrontFlipping = gameLibrary.cookie.loadValue(sectionName, "isFrontFlipping", false);
+                            rubADubLibrary.level.duck.isJumping = gameLibrary.cookie.loadValue(sectionName, "isJumping", false);
+                            rubADubLibrary.level.duck.jumpVelocity = gameLibrary.cookie.loadValue(sectionName, "jumpVelocity", 0);
+                            rubADubLibrary.level.duck.jumpAirTime = gameLibrary.cookie.loadValue(sectionName, "jumpAirTime", 0);
+
+                            sectionName = "rubADubLibrary.level.followingDuckling";
+                            found = gameLibrary.cookie.loadSection(sectionName);
+
+                            if (found) {
+                                rubADubLibrary.level.followingDuckling.total = gameLibrary.cookie.loadValue(sectionName, "total", 0);
+                                rubADubLibrary.level.followingDuckling.counter = gameLibrary.cookie.loadValue(sectionName, "counter", 0);
+                                rubADubLibrary.level.followingDuckling.isVisibledArray = gameLibrary.cookie.loadValue(sectionName, "isVisibledArray", []);
+                                rubADubLibrary.level.followingDuckling.momActionArray = gameLibrary.cookie.loadValue(sectionName, "momActionArray", []);
+
+                                sectionName = "gameLibrary.particle";
+                                found = gameLibrary.cookie.loadSection(sectionName);
+
+                                if (found) {
+                                    gameLibrary.particle.elementArray = gameLibrary.cookie.loadValue(sectionName, "elementArray", []);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!found) {
+            this.save();
+        }
+
+        // info
+        if (rubADubLibrary.infoType == RubADubLibrary.INFO_TYPE_FINISHED) {
+            rubADubLibrary.infoType = RubADubLibrary.INFO_TYPE_NONE;
+            rubADubLibrary.level.currentLevel = 0;
+        }
+
+        // load duck model
+        let duck = rubADubLibrary.level.duck;
+
+        if (duck.modelArrayIndex != duckModelArrayIndex) {
+            if (duckModelArrayIndex == RubADubLibrary.MODEL_MOM) {
+                duck.changeModel(RubADubLibrary.MODEL_MOM, RubADubLibrary.TEXTURE_MOM);
+            } else {
+                duck.changeModel(RubADubLibrary.MODEL_DAD, RubADubLibrary.TEXTURE_DAD);
+            }
+        }
+
+        // soap bubble
+        for (let element of gameLibrary.particle.elementArray) {
+            element.centerVector = createVector(...element.centerVector.values);
+            element.accelerationVector = createVector(...element.accelerationVector.values);
+            element.velocityVector = createVector(...element.velocityVector.values);
+        }
+    }
+
+    save() {
+        gameLibrary.cookie.isConsoleLogVisibled = rubADubLibrary.isDebug;
+
+        if (gameLibrary.cookie.isConsoleLogVisibled) {
+            console.log("\nsave cookie...");
+        }
+
+        gameLibrary.cookie.saveSection(gameLibrary.cookie.key);
+
+        let sectionName = "rubADubLibrary";
+        gameLibrary.cookie.saveSection(sectionName);
+        gameLibrary.cookie.saveValue(sectionName, "isNewGame", rubADubLibrary.isNewGame);
+        gameLibrary.cookie.saveValue(sectionName, "isGameOver", rubADubLibrary.isGameOver);
+        gameLibrary.cookie.saveValue(sectionName, "isGameFinished", rubADubLibrary.isGameFinished);
+        gameLibrary.cookie.saveValue(sectionName, "isGamePaused", rubADubLibrary.isGamePaused);
+        gameLibrary.cookie.saveValue(sectionName, "isTryAgain", rubADubLibrary.isTryAgain);
+        gameLibrary.cookie.saveValue(sectionName, "isContinued", rubADubLibrary.isContinued);
+        gameLibrary.cookie.saveValue(sectionName, "buttonContinueImageIndex", rubADubLibrary.buttonContinueImageIndex);
+        gameLibrary.cookie.saveValue(sectionName, "infoType", rubADubLibrary.infoType);
+
+        sectionName = "rubADubLibrary.levelBlink";
+        gameLibrary.cookie.saveSection(sectionName);
+        gameLibrary.cookie.saveValue(sectionName, "interval", rubADubLibrary.levelBlink.interval);
+        gameLibrary.cookie.saveValue(sectionName, "duration", rubADubLibrary.levelBlink.duration);
+        gameLibrary.cookie.saveValue(sectionName, "elapsedTime", rubADubLibrary.levelBlink.elapsedTime);
+        gameLibrary.cookie.saveValue(sectionName, "isBlinking", rubADubLibrary.levelBlink.isBlinking);
+        gameLibrary.cookie.saveValue(sectionName, "isVisibled", rubADubLibrary.levelBlink.isVisibled);
+
+        sectionName = "rubADubLibrary.level";
+        gameLibrary.cookie.saveSection(sectionName);
+        gameLibrary.cookie.saveValue(sectionName, "currentLevel", rubADubLibrary.level.currentLevel);
+        gameLibrary.cookie.saveValue(sectionName, "isLoadFirstLevel", rubADubLibrary.level.isLoadFirstLevel);
+        gameLibrary.cookie.saveValue(sectionName, "isClearingBlocks", rubADubLibrary.level.isClearingBlocks);
+        gameLibrary.cookie.saveValue(sectionName, "clearingBlocksFactor", rubADubLibrary.level.clearingBlocksFactor);
+        gameLibrary.cookie.saveValue(sectionName, "blockMoveLength", rubADubLibrary.level.blockMoveLength);
+
+        sectionName = "rubADubLibrary.level.duck";
+        gameLibrary.cookie.saveSection(sectionName);
+        gameLibrary.cookie.saveValue(sectionName, "modelArrayIndex", rubADubLibrary.level.duck.modelArrayIndex);
+        gameLibrary.cookie.saveValue(sectionName, "position", rubADubLibrary.level.duck.position);
+        gameLibrary.cookie.saveValue(sectionName, "angle", rubADubLibrary.level.duck.angle);
+        gameLibrary.cookie.saveValue(sectionName, "isFrontFlipping", rubADubLibrary.level.duck.isFrontFlipping);
+        gameLibrary.cookie.saveValue(sectionName, "isJumping", rubADubLibrary.level.duck.isJumping);
+        gameLibrary.cookie.saveValue(sectionName, "jumpVelocity", rubADubLibrary.level.duck.jumpVelocity);
+        gameLibrary.cookie.saveValue(sectionName, "jumpAirTime", rubADubLibrary.level.duck.jumpAirTime);
+
+        sectionName = "rubADubLibrary.level.followingDuckling";
+        gameLibrary.cookie.saveSection(sectionName);
+        gameLibrary.cookie.saveValue(sectionName, "total", rubADubLibrary.level.followingDuckling.total);
+        gameLibrary.cookie.saveValue(sectionName, "counter", rubADubLibrary.level.followingDuckling.counter);
+        gameLibrary.cookie.saveValue(sectionName, "isVisibledArray", rubADubLibrary.level.followingDuckling.isVisibledArray);
+        gameLibrary.cookie.saveValue(sectionName, "momActionArray", rubADubLibrary.level.followingDuckling.momActionArray);
+
+        sectionName = "gameLibrary.particle";
+        gameLibrary.cookie.saveSection(sectionName);
+        gameLibrary.cookie.saveValue(sectionName, "elementArray", gameLibrary.particle.elementArray);
+    }
+}
+
+////////////////////////////////////////////////////////////
 // duck
 ////////////////////////////////////////////////////////////
 class RubADubDuck extends RubADubModel {
@@ -1165,7 +1400,7 @@ class RubADubFollowingDuckling {
 // level
 ////////////////////////////////////////////////////////////
 class RubADubLevel {
-    static get BLOCKS_MOVE_PER_SEC()      {return   6;}
+    static get BLOCKS_MOVE_PER_SEC()     {return   6;}
     static get FADING_BLOCKS()           {return   3;}
     static get CLEARING_BLOCK_DURATION() {return 500;}
 
@@ -1269,25 +1504,28 @@ class RubADubLevel {
          "XXX           AAAAA              X                        X            X                                     X                                            AAAAA               XAAAAX          AAA",
          ]);
          */
-        this.time = 0;
-        this.duckType = 0;
+
         this.duck = null;
         this.duckling = null;
         this.followingDuckling = null;
         this.block = null;
         this.spike = null;
         this.pool = null;
+
         this.fadeOutBlockX = 0;
         this.fadeInBlockX = 0;
         this.centerBlockX = 0;
         this.blockSpeed = 0;
         this.blockMoveStep = 0;
         this.maxBlockMoveLength = 0;
-        this.blockMoveLength = 0;
         this.isBlockCollisionChecked = false;
         this.numberOfLevels = this.dataArray.length;
         this.lastLevel = this.numberOfLevels - 1;
+
         this.isLoadFirstLevel = false;
+        this.isClearingBlocks = false;
+        this.clearingBlocksFactor = 0;
+        this.blockMoveLength = 0;
         this.clearBlocks(false);
     }
 
@@ -1311,6 +1549,10 @@ class RubADubLevel {
 
     init() {
         if (this.pool == null) {
+            if (rubADubLibrary.isDebug) {
+                console.log("\ninit model");
+            }
+
             // block
             this.block = new RubADubBlock();
             this.blockSpeed = (RubADubLevel.BLOCKS_MOVE_PER_SEC * this.block.size.x) / 1000;
@@ -1691,6 +1933,19 @@ class RubADubSoapBubble {
         this.updateTime = 0;
     }
 
+    add(x, y) {
+        this.spawnTime = 0;
+
+        let acceleration = gameLibrary.vector.create(random(-0.2, -0.15), random(-0.1, 0.0), random(-0.01, 0.01));
+        let velocity = gameLibrary.vector.create();
+        let startSize = random(2, 3);
+        let sizeChanged = random(0.1, 0.2);
+        let lifespanChanged = random(10, 15);
+        let position = gameLibrary.vector.create(x, y + (rubADubLibrary.level.duck.halfSize.y * 0.9), rubADubLibrary.level.duck.position.z + random(-3.0, 3.0));
+
+        gameLibrary.particle.add(RubADubSoapBubble.SOAP_BUBBLE_TAG, position, acceleration, velocity, startSize, sizeChanged, lifespanChanged, 0x0000);
+    }
+
     clear() {
         gameLibrary.particle.clear();
     }
@@ -1703,16 +1958,7 @@ class RubADubSoapBubble {
             this.spawnTime += dt;
 
             if (this.spawnTime >= RubADubSoapBubble.SPAWN_TIME) {
-                this.spawnTime = 0;
-
-                let acceleration = gameLibrary.vector.create(random(-0.2, -0.15), random(-0.1, 0.0), random(-0.01, 0.01));
-                let velocity = gameLibrary.vector.create();
-                let startSize = random(2, 3);
-                let sizeChanged = random(0.1, 0.2);
-                let lifespanChanged = random(10, 15);
-                let position = gameLibrary.vector.create(level.duck.position.x, level.duck.position.y + (level.duck.halfSize.y * 0.9), level.duck.position.z + random(-3.0, 3.0));
-
-                gameLibrary.particle.add(RubADubSoapBubble.SOAP_BUBBLE_TAG, position, acceleration, velocity, startSize, sizeChanged, lifespanChanged, 0x0000);
+                this.add(level.duck.position.x, level.duck.position.y);
             }
 
             this.updateTime += dt;
@@ -1721,12 +1967,6 @@ class RubADubSoapBubble {
                 this.updateTime = 0;
             }
         }
-
-        gameLibrary.particle.elementArray.sort((a, b) => {
-            let distA = dist(a.centerVector.x, a.centerVector.y, a.centerVector.z, rubADubLibrary.camera.position.x, rubADubLibrary.camera.position.y, rubADubLibrary.camera.position.z);
-            let distB = dist(b.centerVector.x, b.centerVector.y, b.centerVector.z, rubADubLibrary.camera.position.x, rubADubLibrary.camera.position.y, rubADubLibrary.camera.position.z);
-            return distB - distA;
-        });
 
         for (let i = gameLibrary.particle.elementArray.length - 1; i > 0; i--) {
             let element = gameLibrary.particle.elementArray[i];
@@ -1886,15 +2126,24 @@ GameLibrary.prototype.onButtonPressed = function(buttonIndex) {
             rubADubLibrary.pauseGame();
             break;
 
-        case RubADubLibrary.BUTTON_PLAY:
+        case RubADubLibrary.BUTTON_NEW_GAME:
             rubADubLibrary.isContinued = false;
+            rubADubLibrary.isTryAgain = false;
             rubADubLibrary.isNewGame = true;
             this.changeGameMode(RubADubLibrary.GAME_MODE_NEW_GAME);
             break;
 
         case RubADubLibrary.BUTTON_CONTINUE:
-            rubADubLibrary.isContinued = true;
-            rubADubLibrary.isNewGame = false;
+            if (rubADubLibrary.buttonContinueImageIndex = rubADubLibrary.isTryAgain) {
+                rubADubLibrary.isContinued = false;
+                rubADubLibrary.isTryAgain = true;
+                rubADubLibrary.isNewGame = true;
+            } else {
+                rubADubLibrary.isContinued = true;
+                rubADubLibrary.isTryAgain = false;
+                rubADubLibrary.isNewGame = false;
+            }
+
             this.changeGameMode(RubADubLibrary.GAME_MODE_NEW_GAME);
             break;
     }
@@ -1917,22 +2166,38 @@ GameLibrary.prototype.onChangeGameMode = function(gameMode) {
 
         case RubADubLibrary.GAME_MODE_MENU:
             rubADubLibrary.camera.autoDrift();
+            rubADubLibrary.isContinued = rubADubLibrary.isGamePaused;
             rubADubLibrary.isTryAgain = rubADubLibrary.isGameOver;
-            rubADubLibrary.buttonPlayImageIndex = rubADubLibrary.isTryAgain ? RubADubLibrary.IMAGE_TRY_AGAIN_0 : RubADubLibrary.IMAGE_NEW_GAME_0;
+            rubADubLibrary.buttonContinueImageIndex = rubADubLibrary.isTryAgain ? RubADubLibrary.IMAGE_TRY_AGAIN_0 : RubADubLibrary.IMAGE_CONTINUE_0;
             this.showButton(RubADubLibrary.BUTTON_PAUSE, false);
-            this.selectedButton = rubADubLibrary.isGamePaused ? RubADubLibrary.BUTTON_CONTINUE : RubADubLibrary.BUTTON_PLAY;
+            this.selectedButton = (rubADubLibrary.isGamePaused || rubADubLibrary.isContinued || rubADubLibrary.isTryAgain) ? RubADubLibrary.BUTTON_CONTINUE : RubADubLibrary.BUTTON_NEW_GAME;
+            rubADubLibrary.cookie.save();
             break;
     }
 };
 
 GameLibrary.prototype.onGameReady = function() {
     rubADubLibrary.init();
+    rubADubLibrary.cookie.load();
+    this.changeGameMode(RubADubLibrary.GAME_MODE_MENU);
 };
 
 GameLibrary.prototype.onKeyPressed = function(keyCode) {
-    if (keyCode == GameLibrary.KEY_D) {
+    if (this.isYesOrNo) {
+        if (keyCode == GameLibrary.KEY_Y) {
+            rubADubLibrary.cookie.delete();
+            console.log("cleared");
+        } else {
+            console.log("cancelled");
+        }
+
+        this.isYesOrNo = false;
+    } else if (keyCode == GameLibrary.KEY_D) {
         rubADubLibrary.isDebug = !rubADubLibrary.isDebug;
         console.log("isDebug: %s", rubADubLibrary.isDebug ? "on" : "off");
+    } else if (keyCode == GameLibrary.KEY_C) {
+        console.log("clear cookies? (y/n)");
+        this.isYesOrNo = true;
     } else if (this.gameMode == RubADubLibrary.GAME_MODE_PLAY) {
         if (keyCode == GameLibrary.KEY_ESC) {
             rubADubLibrary.pauseGame();
@@ -1940,9 +2205,9 @@ GameLibrary.prototype.onKeyPressed = function(keyCode) {
     } else if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         if (this.isButtonVisibled(RubADubLibrary.BUTTON_CONTINUE, true)) {
             if (keyCode == GameLibrary.KEY_UP) {
-                this.selectedButton = (this.selectedButton == RubADubLibrary.BUTTON_PLAY) ? RubADubLibrary.BUTTON_CONTINUE : RubADubLibrary.BUTTON_PLAY;
+                this.selectedButton = (this.selectedButton == RubADubLibrary.BUTTON_NEW_GAME) ? RubADubLibrary.BUTTON_CONTINUE : RubADubLibrary.BUTTON_NEW_GAME;
             } else if (keyCode == GameLibrary.KEY_DOWN) {
-                this.selectedButton = (this.selectedButton == RubADubLibrary.BUTTON_CONTINUE) ? RubADubLibrary.BUTTON_PLAY : RubADubLibrary.BUTTON_CONTINUE;
+                this.selectedButton = (this.selectedButton == RubADubLibrary.BUTTON_CONTINUE) ? RubADubLibrary.BUTTON_NEW_GAME : RubADubLibrary.BUTTON_CONTINUE;
             } else if (keyCode == GameLibrary.KEY_ENTER) {
                 if (this.selectedButton != -1) {
                     this.onButtonPressed(this.selectedButton);
@@ -1951,11 +2216,11 @@ GameLibrary.prototype.onKeyPressed = function(keyCode) {
                 this.selectedButton = RubADubLibrary.BUTTON_CONTINUE;
                 this.onButtonPressed(this.selectedButton);
             }
-        } else if (this.isButtonVisibled(RubADubLibrary.BUTTON_PLAY, true)) {
+        } else if (this.isButtonVisibled(RubADubLibrary.BUTTON_NEW_GAME, true)) {
             if (keyCode == GameLibrary.KEY_UP || keyCode == GameLibrary.KEY_DOWN) {
-                this.selectedButton = RubADubLibrary.BUTTON_PLAY;
+                this.selectedButton = RubADubLibrary.BUTTON_NEW_GAME;
             } else if (keyCode == GameLibrary.KEY_ENTER) {
-                this.onButtonPressed(RubADubLibrary.BUTTON_PLAY);
+                this.onButtonPressed(RubADubLibrary.BUTTON_NEW_GAME);
             }
         }
     }
@@ -2097,22 +2362,22 @@ GameLibrary.prototype.onRender = function() {
 
 GameLibrary.prototype.onUpdate = function() {
     if (this.gameMode == RubADubLibrary.GAME_MODE_NEW_GAME) {
-        if (this.isButtonVisibled(RubADubLibrary.BUTTON_CONTINUE, false) && this.isButtonVisibled(RubADubLibrary.BUTTON_PLAY, false) && this.isButtonVisibled(RubADubLibrary.BUTTON_PAUSE, true)) {
+        if (this.isButtonVisibled(RubADubLibrary.BUTTON_CONTINUE, false) && this.isButtonVisibled(RubADubLibrary.BUTTON_NEW_GAME, false) && this.isButtonVisibled(RubADubLibrary.BUTTON_PAUSE, true)) {
             this.changeGameMode(RubADubLibrary.GAME_MODE_PLAY);
         }
     } else if (this.gameMode == RubADubLibrary.GAME_MODE_MENU) {
         if (this.isButtonVisibled(GameLibrary.BUTTON_FULLSCREEN, true) && this.isButtonVisibled(RubADubLibrary.BUTTON_PAUSE, false)) {
-            if (rubADubLibrary.isGamePaused) {
+            if (rubADubLibrary.isGamePaused || rubADubLibrary.isContinued || rubADubLibrary.isTryAgain) {
                 if (!this.isButtonVisibledArray[RubADubLibrary.BUTTON_CONTINUE]) {
                     this.showButton(RubADubLibrary.BUTTON_CONTINUE, true);
                 } else if (this.isButtonVisibled(RubADubLibrary.BUTTON_CONTINUE, true)) {
-                    if (!this.isButtonVisibledArray[RubADubLibrary.BUTTON_PLAY]) {
-                        this.showButton(RubADubLibrary.BUTTON_PLAY, true);
+                    if (!this.isButtonVisibledArray[RubADubLibrary.BUTTON_NEW_GAME]) {
+                        this.showButton(RubADubLibrary.BUTTON_NEW_GAME, true);
                     }
                 }
             } else {
-                if (!this.isButtonVisibledArray[RubADubLibrary.BUTTON_PLAY]) {
-                    this.showButton(RubADubLibrary.BUTTON_PLAY, true);
+                if (!this.isButtonVisibledArray[RubADubLibrary.BUTTON_NEW_GAME]) {
+                    this.showButton(RubADubLibrary.BUTTON_NEW_GAME, true);
                 }
             }
         }
